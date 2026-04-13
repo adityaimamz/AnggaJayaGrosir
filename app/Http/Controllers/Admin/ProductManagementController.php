@@ -1,0 +1,180 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Http\Controllers\Admin;
+
+use App\Data\PaginatedData;
+use App\Http\Controllers\Controller;
+use App\Http\Requests\Admin\StoreProductRequest;
+use App\Http\Requests\Admin\UpdateProductRequest;
+use App\Http\Resources\AdminProductResource;
+use App\Models\Category;
+use App\Models\Product;
+use App\Support\ImageOptimizer;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
+use Inertia\Inertia;
+use Inertia\Response;
+
+final class ProductManagementController extends Controller
+{
+    public function __construct(
+        private readonly ImageOptimizer $imageOptimizer,
+    ) {}
+
+    public function index(Request $request): Response
+    {
+        $categoryId = (int) $request->query('category_id', 0);
+        $search = trim((string) $request->query('search', ''));
+
+        $products = Product::query()
+            ->with('category:id,name,slug')
+            ->when($search !== '', static function ($query) use ($search): void {
+                $query->where(static function ($subQuery) use ($search): void {
+                    $subQuery->where('name', 'like', "%{$search}%")
+                        ->orWhere('slug', 'like', "%{$search}%")
+                        ->orWhereHas('category', static fn ($categoryQuery) => $categoryQuery->where('name', 'like', "%{$search}%"));
+                });
+            })
+            ->when($categoryId > 0, static fn ($query) => $query->where('category_id', $categoryId))
+            ->latest()
+            ->paginate(10)
+            ->withQueryString();
+
+        $products->setCollection(
+            $products->getCollection()->map(
+                static fn (Product $product): array => AdminProductResource::make($product)->resolve(),
+            ),
+        );
+
+        return Inertia::render('Admin/Products', [
+            'products' => PaginatedData::fromLengthAwarePaginator($products)->toArray(),
+            'categories' => Category::query()->orderBy('name')->get(['id', 'name']),
+            'filters' => [
+                'category_id' => $categoryId > 0 ? $categoryId : null,
+                'search' => $search !== '' ? $search : null,
+            ],
+        ]);
+    }
+
+    public function store(StoreProductRequest $request): RedirectResponse
+    {
+        $validated = $request->validated();
+        $disk = $this->disk();
+
+        $images = $this->resolveImages(
+            validated: $validated,
+            disk: $disk,
+            existing: [],
+        );
+
+        Product::query()->create([
+            ...$this->buildPayload($validated),
+            'image' => $images[0] ?? null,
+            'images' => $images,
+        ]);
+
+        return redirect()
+            ->route('admin.products.index')
+            ->with('success', 'Produk berhasil ditambahkan.');
+    }
+
+    public function update(UpdateProductRequest $request, Product $product): RedirectResponse
+    {
+        $validated = $request->validated();
+        $disk = $this->disk();
+
+        $existingImages = array_values(array_filter(is_array($product->images) ? $product->images : [$product->image]));
+
+        $images = $this->resolveImages(
+            validated: $validated,
+            disk: $disk,
+            existing: $existingImages,
+        );
+
+        $product->update([
+            ...$this->buildPayload($validated),
+            'image' => $images[0] ?? null,
+            'images' => $images,
+        ]);
+
+        return redirect()
+            ->route('admin.products.index')
+            ->with('success', 'Produk berhasil diperbarui.');
+    }
+
+    public function destroy(Product $product): RedirectResponse
+    {
+        $paths = array_values(array_filter(is_array($product->images) ? $product->images : [$product->image]));
+        $this->imageOptimizer->deleteMany($paths, $this->disk());
+
+        $product->delete();
+
+        return redirect()
+            ->route('admin.products.index')
+            ->with('success', 'Produk berhasil dihapus.');
+    }
+
+    private function buildPayload(array $validated): array
+    {
+        $variants = $validated['variants'] ?? [];
+        $minPrice = empty($variants) ? 0 : min(array_column($variants, 'price'));
+
+        return [
+            'category_id' => (int) $validated['category_id'],
+            'name' => $validated['name'],
+            'slug' => $validated['slug'],
+            'min_price' => (float) $minPrice,
+            'variant_types' => $validated['variant_types'] ?? [],
+            'variants' => $variants,
+            'description' => $validated['description'] ?? null,
+            'min_order' => $validated['min_order'] ?? null,
+            'min_order_qty' => max(1, (int) ($validated['min_order_qty'] ?? 1)),
+            'badge' => $validated['badge'] ?? null,
+            'is_new' => (bool) ($validated['is_new'] ?? false),
+            'is_best_seller' => (bool) ($validated['is_best_seller'] ?? false),
+            'features' => $validated['features'] ?? [],
+            'feature_descriptions' => $validated['feature_descriptions'] ?? [],
+        ];
+    }
+
+    private function resolveImages(array $validated, string $disk, array $existing): array
+    {
+        $cleanExisting = array_values(array_filter($existing, static fn (mixed $item): bool => is_string($item) && $item !== ''));
+
+        $result = [];
+
+        $fileImages = $validated['image_files'] ?? [];
+        if (is_array($fileImages)) {
+            foreach ($fileImages as $file) {
+                if ($file instanceof UploadedFile) {
+                    $result[] = $this->imageOptimizer->storeOptimized(
+                        file: $file,
+                        disk: $disk,
+                        directory: 'products',
+                    );
+                }
+            }
+        }
+
+        if (count($result) === 0) {
+            return array_slice($cleanExisting, 0, 5);
+        }
+
+        $result = array_values(array_unique(array_slice($result, 0, 5)));
+
+        $deleted = array_diff($cleanExisting, $result);
+        if (count($deleted) > 0) {
+            $this->imageOptimizer->deleteMany(array_values($deleted), $disk);
+        }
+
+        return $result;
+    }
+
+    private function disk(): string
+    {
+        return (string) config('media.disk', 'public');
+    }
+}
