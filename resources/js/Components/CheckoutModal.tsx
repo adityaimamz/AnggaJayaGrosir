@@ -173,6 +173,9 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
         const params = new URLSearchParams({ text });
         const whatsappUrl = `https://wa.me/${whatsappNumber}?${params.toString()}`;
         
+        localStorage.removeItem('cart_items');
+        globalThis.dispatchEvent(new Event('cart:updated'));
+        
         handleClose();
         setTimeout(() => {
             window.location.href = whatsappUrl;

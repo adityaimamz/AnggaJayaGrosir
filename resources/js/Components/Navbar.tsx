@@ -1,5 +1,5 @@
 import { Link, usePage } from '@inertiajs/react';
-import { Search, ShoppingCart } from 'lucide-react';
+import { Home, Search, ShoppingCart } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 interface CartItemSnapshot {
@@ -59,7 +59,7 @@ export default function Navbar({
                             className="h-10 w-auto"
                             src="/logo%20AJ.png"
                         />
-                        <span className="text-on-surface font-headline text-xl font-black tracking-tight uppercase md:text-2xl">
+                        <span className="text-on-surface font-headline text-base sm:text-xl font-black tracking-tight uppercase md:text-2xl">
                             ANGGA JAYA
                         </span>
                     </Link>
@@ -118,6 +118,12 @@ export default function Navbar({
                             <Search className="h-6 w-6" />
                         </button>
                     )}
+                    <Link
+                        href="/"
+                        className={`rounded-full p-2 transition-all md:hidden ${url === '/' ? 'text-primary' : 'text-on-surface-variant hover:bg-surface-container'}`}
+                    >
+                        <Home className="h-6 w-6" />
+                    </Link>
                     <Link
                         href="/cart"
                         className="text-on-surface-variant hover:bg-surface-container relative rounded-full p-2 transition-all"

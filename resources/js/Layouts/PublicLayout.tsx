@@ -1,4 +1,4 @@
-import FloatingMobileMenu from '@/Components/FloatingMobileMenu';
+
 import Footer from '@/Components/Footer';
 import Navbar from '@/Components/Navbar';
 import React from 'react';
@@ -19,7 +19,6 @@ export default function PublicLayout({
             <Navbar search={search} onSearchChange={onSearchChange} />
             <main>{children}</main>
             <Footer />
-            <FloatingMobileMenu />
         </div>
     );
 }

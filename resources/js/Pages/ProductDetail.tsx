@@ -369,7 +369,7 @@ export default function ProductDetail({ product }: ProductDetailProps) {
                             >
                                 <Star className="text-secondary mb-2 h-6 w-6 fill-current" />
                                 <h4 className="text-sm font-bold">
-                                    Katun Premium
+                                    Bahan Premium
                                 </h4>
                                 <p className="text-on-surface-variant text-xs">
                                     Bahan lembut dan tidak gatal.
