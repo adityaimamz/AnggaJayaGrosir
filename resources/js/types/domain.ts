@@ -72,6 +72,7 @@ export interface AdminProductRow {
     imagePaths?: string[];
     isNew?: boolean;
     isBestSeller?: boolean;
+    isActive?: boolean;
     category: CategorySummary;
 }
 

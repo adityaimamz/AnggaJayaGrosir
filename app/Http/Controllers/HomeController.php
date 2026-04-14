@@ -22,6 +22,7 @@ final class HomeController extends Controller
         $sort = trim((string) $request->query('sort', 'newest'));
 
         $products = Product::query()
+            ->where('is_active', true)
             ->with('category:id,name,slug')
             ->when($search !== '', static function ($query) use ($search): void {
                 $query->where(static function ($subQuery) use ($search): void {

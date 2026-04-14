@@ -27,6 +27,7 @@ final class StoreProductRequest extends FormRequest
             'badge' => ['nullable', 'string', 'max:100'],
             'is_new' => ['nullable', 'boolean'],
             'is_best_seller' => ['nullable', 'boolean'],
+            'is_active' => ['nullable', 'boolean'],
             'features' => ['nullable', 'array'],
             'features.*' => ['required', 'string', 'max:255'],
             'feature_descriptions' => ['nullable', 'array'],

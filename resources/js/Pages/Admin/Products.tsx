@@ -44,10 +44,10 @@ interface ProductFormData {
     min_order_qty: string;
     min_order: string;
     badge: string;
-    features_text: string;
-    feature_descriptions_text: string;
+    features_list: { name: string; description: string }[];
     is_new: boolean;
     is_best_seller: boolean;
+    is_active: boolean;
 }
 
 const numberFormatter = new Intl.NumberFormat('id-ID');
@@ -69,17 +69,13 @@ const emptyForm: ProductFormData = {
     min_order_qty: '1',
     min_order: '',
     badge: '',
-    features_text: '',
-    feature_descriptions_text: '',
+    features_list: [],
     is_new: false,
     is_best_seller: false,
+    is_active: true,
 };
 
 function toPayload(data: ProductFormData) {
-    const features = data.features_text
-        .split(',')
-        .map((item) => item.trim())
-        .filter(Boolean);
 
     return {
         category_id: Number(data.category_id),
@@ -100,13 +96,9 @@ function toPayload(data: ProductFormData) {
         badge: data.badge || null,
         is_new: data.is_new,
         is_best_seller: data.is_best_seller,
-        features: features,
-        feature_descriptions: features.length > 0 
-            ? data.feature_descriptions_text
-                .split('|')
-                .map((item) => item.trim())
-                .filter(Boolean)
-            : [],
+        is_active: data.is_active,
+        features: data.features_list.filter(f => f.name.trim() !== '').map(f => f.name.trim()),
+        feature_descriptions: data.features_list.filter(f => f.name.trim() !== '').map(f => f.description.trim()),
     };
 }
 
@@ -119,24 +111,47 @@ function slugify(text: string): string {
         .replace(/-+/g, '-');
 }
 
-function parseCommaList(text: string): string[] {
-    return text
-        .split(',')
-        .map((item) => item.trim())
-        .filter(Boolean);
-}
-
 function toEditForm(product: AdminProductRow): ProductFormData {
+    const variantTypes = Array.isArray(product.variantTypes)
+        ? product.variantTypes.filter((typeName): typeName is string =>
+              typeof typeName === 'string' && typeName.trim() !== '',
+          )
+        : [];
+
+    const variants = Array.isArray(product.variants)
+        ? product.variants.filter(
+              (variant): variant is AdminProductRow['variants'][number] =>
+                  typeof variant === 'object' &&
+                  variant !== null &&
+                  typeof variant.options === 'object' &&
+                  variant.options !== null,
+          )
+        : [];
+
+    const featuresList = (product.features || []).map((name, index) => ({
+        name,
+        description: product.featureDescriptions?.[index] || '',
+    }));
+
     return {
-        category_id: String(product.category.id),
-        name: product.name,
-        slug: product.slug,
-        variant_types: product.variantTypes || [],
-        variant_options_map: (product.variantTypes || []).reduce((acc, typeName) => {
-            acc[typeName] = Array.from(new Set((product.variants || []).map(v => v.options[typeName]).filter(Boolean)));
+        category_id: product.category?.id ? String(product.category.id) : '',
+        name: typeof product.name === 'string' ? product.name : '',
+        slug: typeof product.slug === 'string' ? product.slug : '',
+        variant_types: variantTypes,
+        variant_options_map: variantTypes.reduce((acc, typeName) => {
+            acc[typeName] = Array.from(
+                new Set(
+                    variants
+                        .map((variant) => variant.options[typeName])
+                        .filter(
+                            (value): value is string =>
+                                typeof value === 'string' && value.trim() !== '',
+                        ),
+                ),
+            );
             return acc;
         }, {} as Record<string, string[]>),
-        variants: (product.variants || []).map(v => ({
+        variants: variants.map((v) => ({
             options: v.options,
             price: String(v.price),
             stock: String(v.stock),
@@ -148,10 +163,10 @@ function toEditForm(product: AdminProductRow): ProductFormData {
         min_order_qty: String(product.minOrderQty ?? 1),
         min_order: product.minOrder ?? '',
         badge: product.badge ?? '',
-        features_text: (product.features ?? []).join(', '),
-        feature_descriptions_text: (product.featureDescriptions ?? []).join(' | '),
+        features_list: featuresList,
         is_new: product.isNew ?? false,
         is_best_seller: product.isBestSeller ?? false,
+        is_active: product.isActive ?? true,
     };
 }
 
@@ -276,31 +291,26 @@ export default function Products({
     );
 
     const openCreate = () => {
-        createForm.reset();
-        createForm.setData('image_files', []);
-        createForm.setData('images_preview', []);
+        createForm.setData({ ...emptyForm, image_files: [], images_preview: [] });
+        createForm.clearErrors();
         setShowCreateModal(true);
     };
 
     const closeCreate = () => {
         setShowCreateModal(false);
-        createForm.reset();
-        createForm.setData('image_files', []);
-        createForm.setData('images_preview', []);
+        createForm.setData({ ...emptyForm, image_files: [], images_preview: [] });
         createForm.clearErrors();
     };
 
     const openEdit = (product: AdminProductRow) => {
         setEditingProduct(product);
-        editForm.setData(toEditForm(product));
-        editForm.setData('image_files', []);
+        editForm.clearErrors();
+        editForm.setData(() => ({ ...toEditForm(product), image_files: [] }));
     };
 
     const closeEdit = () => {
         setEditingProduct(null);
-        editForm.reset();
-        editForm.setData('image_files', []);
-        editForm.setData('images_preview', []);
+        editForm.setData({ ...emptyForm, image_files: [], images_preview: [] });
         editForm.clearErrors();
     };
 
@@ -663,7 +673,6 @@ function ProductFormModal({
     onSubmit,
     onClose,
 }: ProductFormModalProps) {
-    const features = parseCommaList(data.features_text);
 
     const [inputModal, setInputModal] = useState<{
         open: boolean;
@@ -1101,40 +1110,72 @@ function ProductFormModal({
                         )}
                     </div>
 
-                    <Field label="Fitur (pisah koma)" error={errors.features}>
-                        <input
-                            value={data.features_text}
-                            onChange={(event) =>
-                                onChange('features_text', event.target.value)
-                            }
-                            className="bg-surface-container focus:border-primary w-full rounded-xl border border-transparent px-3 py-2.5 text-sm focus:outline-none"
-                        />
-                        {features.length > 0 ? (
-                            <div className="mt-2 flex flex-wrap gap-1.5">
-                                {features.map((feature) => (
-                                    <span
-                                        key={feature}
-                                        className="bg-surface-container-highest text-on-surface rounded-full px-2.5 py-1 text-xs font-semibold"
-                                    >
-                                        {feature}
-                                    </span>
+                    <div className="md:col-span-2 rounded-xl border border-surface-container-highest p-4 bg-surface-container-lowest">
+                        <div className="flex items-center justify-between mb-4">
+                            <h3 className="font-headline text-lg font-bold">Fitur Produk</h3>
+                            <button
+                                type="button"
+                                onClick={() =>
+                                    onChange('features_list', [
+                                        ...data.features_list,
+                                        { name: '', description: '' },
+                                    ])
+                                }
+                                className="bg-primary text-white hover:brightness-110 inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-bold transition-all"
+                            >
+                                <Plus className="h-3 w-3" /> Tambah Fitur
+                            </button>
+                        </div>
+
+                        {data.features_list.length === 0 ? (
+                            <p className="text-sm text-on-surface-variant italic mb-4">Belum ada fitur unggulan untuk produk ini.</p>
+                        ) : (
+                            <div className="space-y-3">
+                                {data.features_list.map((feature, idx) => (
+                                    <div key={idx} className="flex flex-col gap-2 bg-surface-container rounded-xl p-3 sm:flex-row sm:items-start">
+                                        <div className="flex-1">
+                                            <input
+                                                placeholder="Nama Fitur (cth: Bahan Premium)"
+                                                value={feature.name}
+                                                onChange={(e) => {
+                                                    const newList = [...data.features_list];
+                                                    newList[idx].name = e.target.value;
+                                                    onChange('features_list', newList);
+                                                }}
+                                                className="bg-surface-container-lowest focus:border-primary w-full rounded-lg border border-transparent px-3 py-2 text-sm focus:outline-none placeholder:text-on-surface-variant/50"
+                                            />
+                                            {errors[`features.${idx}`] && <InputError className="mt-1" message={errors[`features.${idx}`]} />}
+                                        </div>
+                                        <div className="flex-1">
+                                            <input
+                                                placeholder="Deskripsi Fitur Singkat"
+                                                value={feature.description}
+                                                onChange={(e) => {
+                                                    const newList = [...data.features_list];
+                                                    newList[idx].description = e.target.value;
+                                                    onChange('features_list', newList);
+                                                }}
+                                                className="bg-surface-container-lowest focus:border-primary w-full rounded-lg border border-transparent px-3 py-2 text-sm focus:outline-none placeholder:text-on-surface-variant/50"
+                                            />
+                                            {errors[`feature_descriptions.${idx}`] && <InputError className="mt-1" message={errors[`feature_descriptions.${idx}`]} />}
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                const newList = [...data.features_list];
+                                                newList.splice(idx, 1);
+                                                onChange('features_list', newList);
+                                            }}
+                                            className="text-on-surface-variant hover:bg-surface-container-highest self-end sm:self-auto rounded-lg p-2 hover:text-red-500 transition-colors"
+                                        >
+                                            <Trash2 className="h-4 w-4" />
+                                        </button>
+                                    </div>
                                 ))}
                             </div>
-                        ) : null}
-                    </Field>
-
-                    <Field label="Deskripsi Fitur (pisah dengan |)" error={errors.feature_descriptions}>
-                        <textarea
-                            value={data.feature_descriptions_text}
-                            onChange={(event) =>
-                                onChange('feature_descriptions_text', event.target.value)
-                            }
-                            rows={3}
-                            disabled={features.length === 0}
-                            placeholder={features.length === 0 ? "Isi kolom Fitur terlebih dahulu..." : "Cth: Deskripsi fitur 1 | Deskripsi fitur 2"}
-                            className="bg-surface-container focus:border-primary w-full rounded-xl border border-transparent px-3 py-2.5 text-sm focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
-                        />
-                    </Field>
+                        )}
+                        {errors.features && <InputError className="mt-2" message={errors.features} />}
+                    </div>
                 </div>
 
                 <div className="mt-4">
@@ -1150,27 +1191,28 @@ function ProductFormModal({
                     </Field>
                 </div>
 
-                <div className="mt-4 flex flex-wrap gap-4 text-sm">
-                    <label className="inline-flex items-center gap-2">
-                        <input
-                            type="checkbox"
-                            checked={data.is_new}
-                            onChange={(event) =>
-                                onChange('is_new', event.target.checked)
-                            }
-                        />
-                        Produk Baru
-                    </label>
-                    <label className="inline-flex items-center gap-2">
-                        <input
-                            type="checkbox"
-                            checked={data.is_best_seller}
-                            onChange={(event) =>
-                                onChange('is_best_seller', event.target.checked)
-                            }
-                        />
-                        Best Seller
-                    </label>
+                <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-3">
+                    <ToggleSwitch
+                        label="Produk Aktif"
+                        description="Tampilkan di etalase"
+                        checked={data.is_active}
+                        onChange={(val) => onChange('is_active', val)}
+                        activeColor="bg-emerald-500"
+                    />
+                    <ToggleSwitch
+                        label="Produk Baru"
+                        description="Tandai sebagai baru"
+                        checked={data.is_new}
+                        onChange={(val) => onChange('is_new', val)}
+                        activeColor="bg-sky-500"
+                    />
+                    <ToggleSwitch
+                        label="Best Seller"
+                        description="Tandai terlaris"
+                        checked={data.is_best_seller}
+                        onChange={(val) => onChange('is_best_seller', val)}
+                        activeColor="bg-amber-500"
+                    />
                 </div>
 
                 <div className="mt-6 flex items-center justify-end gap-2">
@@ -1259,5 +1301,49 @@ function Field({
             {children}
             <InputError className="mt-1" message={error} />
         </div>
+    );
+}
+
+function ToggleSwitch({
+    label,
+    description,
+    checked,
+    onChange,
+    activeColor = 'bg-primary',
+}: {
+    label: string;
+    description?: string;
+    checked: boolean;
+    onChange: (value: boolean) => void;
+    activeColor?: string;
+}) {
+    return (
+        <button
+            type="button"
+            onClick={() => onChange(!checked)}
+            className={`flex items-center gap-3 rounded-xl border p-3 text-left transition-all ${
+                checked
+                    ? 'border-transparent bg-surface-container-low shadow-sm'
+                    : 'border-dashed border-surface-container-highest bg-surface-container-lowest opacity-60'
+            }`}
+        >
+            <div
+                className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors duration-200 ${
+                    checked ? activeColor : 'bg-surface-container-highest'
+                }`}
+            >
+                <span
+                    className={`inline-block h-4 w-4 rounded-full bg-white shadow-md transition-transform duration-200 ${
+                        checked ? 'translate-x-6' : 'translate-x-1'
+                    }`}
+                />
+            </div>
+            <div className="min-w-0">
+                <p className="text-on-surface text-sm font-semibold leading-tight">{label}</p>
+                {description && (
+                    <p className="text-on-surface-variant text-xs leading-tight">{description}</p>
+                )}
+            </div>
+        </button>
     );
 }

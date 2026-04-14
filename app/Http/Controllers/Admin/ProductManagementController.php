@@ -136,6 +136,7 @@ final class ProductManagementController extends Controller
             'badge' => $validated['badge'] ?? null,
             'is_new' => (bool) ($validated['is_new'] ?? false),
             'is_best_seller' => (bool) ($validated['is_best_seller'] ?? false),
+            'is_active' => (bool) ($validated['is_active'] ?? true),
             'features' => $validated['features'] ?? [],
             'feature_descriptions' => $validated['feature_descriptions'] ?? [],
         ];
