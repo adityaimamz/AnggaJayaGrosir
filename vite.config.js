@@ -12,4 +12,12 @@ export default defineConfig({
         react(),
         tailwindcss(),
     ],
+    server: {
+        // Bind dev server locally to reduce exposure when running Vite during development.
+        host: '127.0.0.1',
+        allowedHosts: ['localhost', '127.0.0.1'],
+        cors: {
+            origin: /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/,
+        },
+    },
 });

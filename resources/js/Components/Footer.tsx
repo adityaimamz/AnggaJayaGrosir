@@ -1,3 +1,4 @@
+import { Link } from '@inertiajs/react';
 import React from 'react';
 
 export default function Footer() {
@@ -12,14 +13,20 @@ export default function Footer() {
         </div>
         
         <div className="flex flex-wrap justify-center gap-8">
-          <a className="text-on-surface-variant hover:text-primary transition-colors font-body text-base" href="#">Syarat & Ketentuan</a>
-          <a className="text-on-surface-variant hover:text-primary transition-colors font-body text-base" href="#">Kebijakan Privasi</a>
-          <a className="text-on-surface-variant hover:text-primary transition-colors font-body text-base" href="#banner-carousel" onClick={(e) => {
-            e.preventDefault();
-            document.getElementById('banner-carousel')?.scrollIntoView({ behavior: 'smooth' });
-          }}>
+          <Link className="text-on-surface-variant hover:text-primary transition-colors font-body text-base" href="#">Syarat & Ketentuan</Link>
+          <Link className="text-on-surface-variant hover:text-primary transition-colors font-body text-base" href="#">Kebijakan Privasi</Link>
+          <Link 
+            className="text-on-surface-variant hover:text-primary transition-colors font-body text-base" 
+            href="/#banner-carousel" 
+            onClick={(e) => {
+              if (window.location.pathname === '/') {
+                e.preventDefault();
+                document.getElementById('banner-carousel')?.scrollIntoView({ behavior: 'smooth' });
+              }
+            }}
+          >
             Panduan Grosir
-          </a>
+          </Link>
         </div>
         
         <div className="pt-8 border-t border-surface-container w-full">

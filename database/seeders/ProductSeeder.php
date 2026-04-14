@@ -84,17 +84,23 @@ final class ProductSeeder extends Seeder
                 [
                     'category_id' => $category->id,
                     'name' => $normalizedName,
-                    'price' => 0,
+                    'min_price' => 0,
                     'image' => $storedPath,
                     'images' => [$storedPath],
                     'description' => null,
                     'features' => [],
-                    'sizes' => [],
+                    'feature_descriptions' => [],
+                    'variant_types' => ['Ukuran'],
+                    'variants' => [[
+                        'options' => ['Ukuran' => 'All Size'],
+                        'price' => 0,
+                        'stock' => 0,
+                    ]],
                     'min_order' => null,
+                    'min_order_qty' => 1,
                     'is_new' => false,
                     'is_best_seller' => false,
                     'badge' => null,
-                    'stock' => 0,
                 ],
             );
         }
@@ -108,22 +114,21 @@ final class ProductSeeder extends Seeder
             File::directories(public_path()),
             function (string $directory) use ($excluded): bool {
                 $basename = basename($directory);
+                $shouldInclude = ! in_array($basename, $excluded, true);
 
-                if (in_array($basename, $excluded, true)) {
-                    return false;
-                }
-
-                if ($this->hasImages($directory)) {
-                    return true;
-                }
-
-                foreach (File::directories($directory) as $subDir) {
-                    if ($this->hasImages($subDir)) {
-                        return true;
+                if ($shouldInclude && ! $this->hasImages($directory)) {
+                    $hasImagesInSubDirectory = false;
+                    foreach (File::directories($directory) as $subDir) {
+                        if ($this->hasImages($subDir)) {
+                            $hasImagesInSubDirectory = true;
+                            break;
+                        }
                     }
+
+                    $shouldInclude = $hasImagesInSubDirectory;
                 }
 
-                return false;
+                return $shouldInclude;
             },
         ));
     }

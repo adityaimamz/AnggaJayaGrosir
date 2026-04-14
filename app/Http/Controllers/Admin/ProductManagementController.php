@@ -28,14 +28,15 @@ final class ProductManagementController extends Controller
     {
         $categoryId = (int) $request->query('category_id', 0);
         $search = trim((string) $request->query('search', ''));
+        $escapedSearch = str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $search);
 
         $products = Product::query()
             ->with('category:id,name,slug')
-            ->when($search !== '', static function ($query) use ($search): void {
-                $query->where(static function ($subQuery) use ($search): void {
-                    $subQuery->where('name', 'like', "%{$search}%")
-                        ->orWhere('slug', 'like', "%{$search}%")
-                        ->orWhereHas('category', static fn ($categoryQuery) => $categoryQuery->where('name', 'like', "%{$search}%"));
+            ->when($search !== '', static function ($query) use ($escapedSearch): void {
+                $query->where(static function ($subQuery) use ($escapedSearch): void {
+                    $subQuery->where('name', 'like', "%{$escapedSearch}%")
+                        ->orWhere('slug', 'like', "%{$escapedSearch}%")
+                        ->orWhereHas('category', static fn ($categoryQuery) => $categoryQuery->where('name', 'like', "%{$escapedSearch}%"));
                 });
             })
             ->when($categoryId > 0, static fn ($query) => $query->where('category_id', $categoryId))

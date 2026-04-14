@@ -2,6 +2,7 @@ import AppModal from '@/Components/AppModal';
 import InvoiceTemplate from '@/Components/InvoiceTemplate';
 import axios from 'axios';
 import { toPng } from 'html-to-image';
+import { CheckCircle, Download } from 'lucide-react';
 import React, { useRef, useState } from 'react';
 
 export interface CheckoutItem {
@@ -40,6 +41,8 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
     items,
     totalAmount,
 }) => {
+    const [step, setStep] = useState<1 | 2 | 3>(1);
+    const [invoiceDownloaded, setInvoiceDownloaded] = useState(false);
     const [form, setForm] = useState<CheckoutForm>({
         name: '',
         address: '',
@@ -56,6 +59,8 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
     ).replaceAll(/\D/g, '');
 
     const resetForm = () => {
+        setStep(1);
+        setInvoiceDownloaded(false);
         setForm({
             name: '',
             address: '',
@@ -88,7 +93,7 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
             `Alamat: ${form.address.trim()}`,
             `Ekspedisi: ${form.expedition.trim()}`,
             '',
-            'Selanjutnya admin akan membuat nota terlebih dahulu. Mohon tunggu sebentar.',
+            'Tunggu saya lampirkan notanya terlebih dahulu.',
             '',
             '[PERHATIAN]',
             '- Website tidak menunjukan ketersediaan stok di toko kami',
@@ -97,34 +102,7 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
         ].join('\n');
     };
 
-    const downloadInvoiceImage = async (code: string): Promise<void> => {
-        if (!invoiceRef.current) return;
-
-        setIsExporting(true);
-        try {
-            // Wait for DOM update
-            await new Promise((resolve) => setTimeout(resolve, 150));
-
-            const dataUrl = await toPng(invoiceRef.current, {
-                cacheBust: true,
-                backgroundColor: '#ffffff',
-            });
-
-            const fileName = `invoice-${code.toLowerCase()}-${Date.now()}.png`;
-            const downloadLink = document.createElement('a');
-            downloadLink.href = dataUrl;
-            downloadLink.download = fileName;
-            document.body.appendChild(downloadLink);
-            downloadLink.click();
-            downloadLink.remove();
-        } catch (err) {
-            console.error('Failed to export invoice image:', err);
-        } finally {
-            setIsExporting(false);
-        }
-    };
-
-    const handleSubmit = async (event: React.FormEvent) => {
+    const handleProceedToPreview = async (event: React.FormEvent) => {
         event.preventDefault();
 
         if (!form.name.trim() || !form.address.trim() || !form.expedition.trim()) {
@@ -150,18 +128,7 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
             const code = response.data.data.orderCode;
             setOrderCode(code);
-
-            const text = buildWhatsappMessage(code);
-            const params = new URLSearchParams({ text });
-            const whatsappUrl = `https://wa.me/${whatsappNumber}?${params.toString()}`;
-
-            await downloadInvoiceImage(code);
-
-            handleClose();
-
-            setTimeout(() => {
-                window.location.href = whatsappUrl;
-            }, 150);
+            setStep(2);
         } catch (err) {
             console.error('Checkout error:', err);
             setError('Checkout gagal disimpan. Coba lagi beberapa saat.');
@@ -170,16 +137,81 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
         }
     };
 
+    const downloadInvoiceImage = async (): Promise<void> => {
+        if (!invoiceRef.current || !orderCode) return;
+
+        setIsExporting(true);
+        try {
+            await new Promise((resolve) => setTimeout(resolve, 150));
+
+            const dataUrl = await toPng(invoiceRef.current, {
+                cacheBust: true,
+                backgroundColor: '#ffffff',
+            });
+
+            const fileName = `invoice-${orderCode.toLowerCase()}-${Date.now()}.png`;
+            const downloadLink = document.createElement('a');
+            downloadLink.href = dataUrl;
+            downloadLink.download = fileName;
+            document.body.appendChild(downloadLink);
+            downloadLink.click();
+            downloadLink.remove();
+            
+            setInvoiceDownloaded(true);
+            setStep(3);
+        } catch (err) {
+            console.error('Failed to export invoice image:', err);
+            setError('Gagal mengunduh invoice. Silakan coba lagi.');
+        } finally {
+            setIsExporting(false);
+        }
+    };
+
+    const handleProceedToWhatsapp = () => {
+        if (!orderCode) return;
+        const text = buildWhatsappMessage(orderCode);
+        const params = new URLSearchParams({ text });
+        const whatsappUrl = `https://wa.me/${whatsappNumber}?${params.toString()}`;
+        
+        handleClose();
+        setTimeout(() => {
+            window.location.href = whatsappUrl;
+        }, 150);
+    };
+
     return (
-        <>
-            <AppModal
-                open={open}
-                title="Data Pengiriman"
-                description="Isi data berikut sebelum melanjutkan checkout via WhatsApp."
-                onClose={handleClose}
-                maxWidthClass="max-w-xl"
-            >
-                <form onSubmit={handleSubmit} className="space-y-4">
+        <AppModal
+            open={open}
+            title={step === 1 ? 'Data Pengiriman' : 'Preview Invoice'}
+            description={
+                step === 1 
+                    ? 'Isi data berikut sebelum melanjutkan pesanan.' 
+                    : step === 2 
+                        ? 'Mohon unduh invoice ini sebelum lanjut ke WhatsApp.'
+                        : 'Invoice berhasil diunduh. Silakan lanjut ke WhatsApp dan kirim invoice ke chat Admin.'
+            }
+            onClose={handleClose}
+            maxWidthClass={step === 1 ? 'max-w-xl' : 'max-w-3xl'}
+        >
+            {/* Stepper Progress */}
+            <div className="mb-6 flex items-center justify-between relative px-2">
+                <div className="absolute left-6 right-6 top-1/2 h-0.5 bg-surface-container -z-10 -translate-y-1/2"></div>
+                <div className="absolute left-6 top-1/2 h-0.5 bg-primary -z-10 -translate-y-1/2 transition-all duration-300" style={{ width: step === 1 ? '0%' : step === 2 ? '50%' : 'calc(100% - 3rem)' }}></div>
+                
+                {[1, 2, 3].map((s) => (
+                    <div key={s} className="flex flex-col items-center gap-1.5 bg-surface-container-lowest px-2 py-1">
+                        <div className={`flex h-8 w-8 items-center justify-center rounded-full text-sm font-bold transition-all ${step >= s ? 'bg-primary text-white scale-110 shadow-sm' : 'bg-surface-container-high text-on-surface-variant'}`}>
+                            {s === 3 && step === 3 ? <CheckCircle className="h-4 w-4" /> : s}
+                        </div>
+                        <span className={`text-[10px] font-semibold uppercase tracking-wider ${step >= s ? 'text-primary' : 'text-on-surface-variant'}`}>
+                            {s === 1 ? 'Data' : s === 2 ? 'Preview' : 'WhatsApp'}
+                        </span>
+                    </div>
+                ))}
+            </div>
+
+            {step === 1 && (
+                <form onSubmit={handleProceedToPreview} className="space-y-4">
                     <div>
                         <label
                             htmlFor="checkout-name"
@@ -249,49 +281,101 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
                         </p>
                     )}
 
-                    <div className="flex items-center justify-end gap-2 pt-2">
+                    <div className="flex flex-col-reverse sm:flex-row items-center justify-end gap-3 pt-4 sm:pt-2">
                         <button
                             type="button"
                             onClick={handleClose}
-                            disabled={isSubmitting || isExporting}
-                            className="bg-surface-container rounded-xl px-4 py-2 text-sm font-semibold"
+                            disabled={isSubmitting}
+                            className="bg-surface-container hover:bg-surface-container-high transition-colors rounded-xl px-5 py-2.5 text-sm font-semibold w-full sm:w-auto"
                         >
                             Batal
                         </button>
                         <button
                             type="submit"
-                            disabled={isSubmitting || isExporting}
-                            className="bg-tertiary rounded-xl px-4 py-2 text-sm font-bold text-white disabled:opacity-50"
+                            disabled={isSubmitting}
+                            className="bg-primary hover:brightness-110 transition-all rounded-xl px-5 py-2.5 text-sm font-bold text-white disabled:opacity-50 flex items-center justify-center gap-2 w-full sm:w-auto"
                         >
-                            {isSubmitting
-                                ? 'Menyimpan...'
-                                : isExporting
-                                  ? 'Mengekspor Invoice...'
-                                  : 'Lanjut ke WhatsApp'}
+                            {isSubmitting ? 'Menyimpan...' : 'Lanjut ke Preview'}
                         </button>
                     </div>
                 </form>
-            </AppModal>
+            )}
 
-            {/* Hidden Invoice Template for Export */}
-            <div style={{ position: 'absolute', left: '-9999px', top: 0 }}>
-                <InvoiceTemplate
-                    ref={invoiceRef}
-                    noTransaksi={orderCode || 'PENDING'}
-                    namaPelanggan={form.name || '-'}
-                    alamat={form.address || '-'}
-                    ekspedisi={form.expedition || '-'}
-                    tanggal={new Date().toLocaleString('id-ID')}
-                    items={items.map((item, index) => ({
-                        no: index + 1,
-                        namaItem: `${item.name} (${item.size})`,
-                        jumlah: item.quantity,
-                        satuan: item.pack,
-                        total: item.price * item.quantity,
-                    }))}
-                />
-            </div>
-        </>
+            {(step === 2 || step === 3) && (
+                <div className="space-y-5">
+                    {/* Invoice View Container */}
+                    <div className="max-h-[50vh] overflow-auto rounded-xl border border-black/10 bg-surface-container-lowest shadow-inner">
+                        <div className="w-max p-4 mx-auto">
+                            <InvoiceTemplate
+                                ref={invoiceRef}
+                                noTransaksi={orderCode || 'PENDING'}
+                                namaPelanggan={form.name || '-'}
+                                alamat={form.address || '-'}
+                                ekspedisi={form.expedition || '-'}
+                                tanggal={new Date().toLocaleString('id-ID')}
+                                items={items.map((item, index) => ({
+                                    no: index + 1,
+                                    namaItem: `${item.name} (${item.size})`,
+                                    jumlah: item.quantity,
+                                    satuan: item.pack,
+                                    total: item.price * item.quantity,
+                                }))}
+                            />
+                        </div>
+                    </div>
+                    
+                    {error && (
+                        <p className="text-sm font-medium text-red-600">
+                            {error}
+                        </p>
+                    )}
+                    
+                    {step === 3 && (
+                        <div className="bg-[#e8f5e9] text-[#2e7d32] border border-[#c8e6c9] rounded-xl px-4 py-3 flex items-start gap-3">
+                            <CheckCircle className="h-6 w-6 shrink-0 mt-0.5" />
+                            <div>
+                                <h4 className="font-bold text-sm mb-1">Invoice Berhasil Diunduh!</h4>
+                                <p className="text-xs">Anda sudah bisa melanjutkan pesanan ke WhatsApp. Jangan lupa kirim gambar invoice yang barusan diunduh ke chat Admin agar pesanan Anda bisa segera diproses.</p>
+                            </div>
+                        </div>
+                    )}
+
+                    <div className="flex flex-col-reverse sm:flex-row items-center justify-end gap-3 pt-4 sm:pt-2 pb-4 sm:pb-0">
+                        {step === 2 && (
+                            <button
+                                type="button"
+                                onClick={() => handleClose()}
+                                disabled={isExporting}
+                                className="bg-surface-container hover:bg-surface-container-high transition-colors rounded-xl px-5 py-3 text-sm font-semibold w-full sm:w-auto"
+                            >
+                                Batal
+                            </button>
+                        )}
+                        
+                        {!invoiceDownloaded ? (
+                            <button
+                                type="button"
+                                onClick={downloadInvoiceImage}
+                                disabled={isExporting}
+                                className="bg-primary hover:brightness-110 transition-all flex items-center justify-center gap-2 rounded-xl px-6 py-3 text-sm font-bold text-white disabled:opacity-50 w-full sm:w-auto sm:min-w-[200px]"
+                            >
+                                <Download className="h-5 w-5" />
+                                {isExporting ? 'Mengekspor...' : 'Unduh Invoice'}
+                            </button>
+                        ) : (
+                            <button
+                                type="button"
+                                onClick={handleProceedToWhatsapp}
+                                className="bg-tertiary hover:brightness-110 transition-all flex items-center justify-center gap-2 rounded-xl px-6 py-3 text-sm font-bold text-white w-full sm:w-auto sm:min-w-[200px]"
+                            >
+                                <CheckCircle className="h-5 w-5" />
+                                Lanjut ke WhatsApp
+                            </button>
+                        )}
+                    </div>
+                </div>
+            )}
+        </AppModal>
     );
 };
 
