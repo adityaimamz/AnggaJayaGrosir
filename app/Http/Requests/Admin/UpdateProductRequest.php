@@ -22,6 +22,7 @@ final class UpdateProductRequest extends FormRequest
 
         return [
             'category_id' => ['required', 'integer', 'exists:categories,id'],
+            'brand_id' => ['nullable', 'integer', 'exists:brands,id'],
             'name' => ['required', 'string', 'max:255'],
             'slug' => [
                 'required',
@@ -44,6 +45,13 @@ final class UpdateProductRequest extends FormRequest
             'features.*' => ['required', 'string', 'max:255'],
             'feature_descriptions' => ['nullable', 'array'],
             'feature_descriptions.*' => ['nullable', 'string', 'max:500'],
+            'size_guide' => ['nullable', 'array'],
+            'size_guide.columns' => ['nullable', 'array'],
+            'size_guide.columns.*' => ['required', 'string', 'max:100'],
+            'size_guide.rows' => ['nullable', 'array'],
+            'size_guide.rows.*.label' => ['required', 'string', 'max:50'],
+            'size_guide.rows.*.values' => ['required', 'array'],
+            'size_guide.rows.*.values.*' => ['nullable', 'string', 'max:100'],
             'variant_types' => ['nullable', 'array', 'max:2'],
             'variant_types.*' => ['required', 'string', 'max:50'],
             'variants' => ['required', 'array', 'min:1'],

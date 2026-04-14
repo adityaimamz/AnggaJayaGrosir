@@ -1,5 +1,8 @@
 <?php
 
+use App\Http\Controllers\Admin\BannerManagementController;
+
+use App\Http\Controllers\Admin\BrandManagementController;
 use App\Http\Controllers\Admin\CategoryManagementController;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\ProductManagementController;
@@ -39,6 +42,14 @@ Route::middleware(['auth'])->prefix('admin')->group(function () {
     Route::put('/categories/{category}', [CategoryManagementController::class, 'update'])->name('admin.categories.update');
     Route::delete('/categories/{category}', [CategoryManagementController::class, 'destroy'])->name('admin.categories.destroy');
     Route::get('/wa-orders', [WhatsappOrderManagementController::class, 'index'])->name('admin.wa-orders.index');
+    Route::get('/brands', [BrandManagementController::class, 'index'])->name('admin.brands.index');
+    Route::post('/brands', [BrandManagementController::class, 'store'])->name('admin.brands.store');
+    Route::put('/brands/{brand}', [BrandManagementController::class, 'update'])->name('admin.brands.update');
+    Route::delete('/brands/{brand}', [BrandManagementController::class, 'destroy'])->name('admin.brands.destroy');
+    Route::get('/banners', [BannerManagementController::class, 'index'])->name('admin.banners.index');
+    Route::post('/banners', [BannerManagementController::class, 'store'])->name('admin.banners.store');
+    Route::put('/banners/{banner}', [BannerManagementController::class, 'update'])->name('admin.banners.update');
+    Route::delete('/banners/{banner}', [BannerManagementController::class, 'destroy'])->name('admin.banners.destroy');
 });
 
 require __DIR__.'/auth.php';

@@ -5,7 +5,9 @@ import { PageProps } from '@/types';
 import {
     AdminCategoryOption,
     AdminProductRow,
+    BrandOption,
     LengthAwarePaginated,
+    SizeGuide,
 } from '@/types/domain';
 import { Link, router, useForm, usePage } from '@inertiajs/react';
 import {
@@ -18,12 +20,14 @@ import {
     Sparkles,
     Trash2,
     X,
+    Settings2,
 } from 'lucide-react';
 import { FormEvent, ReactNode, useEffect, useMemo, useState } from 'react';
 
 interface ProductManagementProps {
     products: LengthAwarePaginated<AdminProductRow>;
     categories: AdminCategoryOption[];
+    brands: BrandOption[];
     filters?: {
         category_id?: number | null;
         search?: string | null;
@@ -48,6 +52,9 @@ interface ProductFormData {
     is_new: boolean;
     is_best_seller: boolean;
     is_active: boolean;
+    brand_id: string;
+    size_guide_columns: string[];
+    size_guide_rows: { label: string; values: string[] }[];
 }
 
 const numberFormatter = new Intl.NumberFormat('id-ID');
@@ -73,6 +80,9 @@ const emptyForm: ProductFormData = {
     is_new: false,
     is_best_seller: false,
     is_active: true,
+    brand_id: '',
+    size_guide_columns: [],
+    size_guide_rows: [],
 };
 
 function toPayload(data: ProductFormData) {
@@ -97,8 +107,12 @@ function toPayload(data: ProductFormData) {
         is_new: data.is_new,
         is_best_seller: data.is_best_seller,
         is_active: data.is_active,
+        brand_id: data.brand_id ? Number(data.brand_id) : null,
         features: data.features_list.filter(f => f.name.trim() !== '').map(f => f.name.trim()),
         feature_descriptions: data.features_list.filter(f => f.name.trim() !== '').map(f => f.description.trim()),
+        size_guide: data.size_guide_columns.length > 0 && data.size_guide_rows.length > 0
+            ? { columns: data.size_guide_columns, rows: data.size_guide_rows }
+            : null,
     };
 }
 
@@ -167,16 +181,21 @@ function toEditForm(product: AdminProductRow): ProductFormData {
         is_new: product.isNew ?? false,
         is_best_seller: product.isBestSeller ?? false,
         is_active: product.isActive ?? true,
+        brand_id: product.brandId ? String(product.brandId) : '',
+        size_guide_columns: product.sizeGuide?.columns ?? [],
+        size_guide_rows: product.sizeGuide?.rows ?? [],
     };
 }
 
 export default function Products({
     products,
     categories,
+    brands: initialBrands,
     filters,
 }: ProductManagementProps) {
     const page = usePage<PageProps>();
     const flashSuccess = page.props.flash?.success;
+    const [brands, setBrands] = useState<BrandOption[]>(initialBrands);
 
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [deleteTarget, setDeleteTarget] = useState<AdminProductRow | null>(
@@ -189,45 +208,36 @@ export default function Products({
     );
     const [searchInput, setSearchInput] = useState(filters?.search ?? '');
 
+    // Sinkronisasi saat props filters berubah dari luar (misalnya navigasi browser)
     useEffect(() => {
-        setSelectedCategory(
-            filters?.category_id ? String(filters.category_id) : 'all',
-        );
+        const fromProps = filters?.category_id ? String(filters.category_id) : 'all';
+        setSelectedCategory(fromProps);
     }, [filters?.category_id]);
 
     useEffect(() => {
         setSearchInput(filters?.search ?? '');
     }, [filters?.search]);
 
-    useEffect(() => {
-        const current = filters?.category_id
-            ? String(filters.category_id)
-            : 'all';
+    // Handler perubahan dropdown — langsung navigasi
+    const handleCategoryChange = (value: string) => {
+        setSelectedCategory(value);
+
         const activeSearch = (filters?.search ?? '').trim();
-
-        if (selectedCategory === current) {
-            return;
-        }
-
         const payload: Record<string, number | string> = {};
-        if (selectedCategory !== 'all') {
-            payload.category_id = Number(selectedCategory);
+        if (value !== 'all') {
+            payload.category_id = Number(value);
         }
         if (activeSearch !== '') {
             payload.search = activeSearch;
         }
 
-        router.get(
-            '/admin/products',
-            payload,
-            {
-                preserveState: true,
-                preserveScroll: true,
-                replace: true,
-                only: ['products', 'filters'],
-            },
-        );
-    }, [filters?.category_id, selectedCategory]);
+        router.get('/admin/products', payload, {
+            preserveState: true,
+            preserveScroll: true,
+            replace: true,
+            only: ['products', 'filters'],
+        });
+    };
 
     const createForm = useForm<ProductFormData>(emptyForm);
     const editForm = useForm<ProductFormData>(emptyForm);
@@ -316,7 +326,11 @@ export default function Products({
 
     const submitCreate = (event: FormEvent) => {
         event.preventDefault();
-        createForm.transform((data) => toPayload(data));
+        createForm.transform((data) => ({
+            ...toPayload(data),
+            _filter_category_id: selectedCategory !== 'all' ? selectedCategory : '',
+            _filter_search: filters?.search ?? '',
+        }));
         createForm.post('/admin/products', {
             preserveScroll: true,
             forceFormData: true,
@@ -333,6 +347,8 @@ export default function Products({
         editForm.transform((data) => ({
             ...toPayload(data),
             _method: 'PUT',
+            _filter_category_id: selectedCategory !== 'all' ? selectedCategory : '',
+            _filter_search: filters?.search ?? '',
         }));
 
         // Use POST with _method spoofing because PHP doesn't support PUT with multipart/form-data
@@ -352,7 +368,11 @@ export default function Products({
             return;
         }
 
-        editForm.delete(`/admin/products/${deleteTarget.id}`, {
+        const deleteUrl = selectedCategory !== 'all'
+            ? `/admin/products/${deleteTarget.id}?_filter_category_id=${selectedCategory}${filters?.search ? `&_filter_search=${filters.search}` : ''}`
+            : `/admin/products/${deleteTarget.id}`;
+
+        editForm.delete(deleteUrl, {
             preserveScroll: true,
             onSuccess: () => setDeleteTarget(null),
         });
@@ -393,7 +413,7 @@ export default function Products({
                         <select
                             value={selectedCategory}
                             onChange={(event) =>
-                                setSelectedCategory(event.target.value)
+                                handleCategoryChange(event.target.value)
                             }
                             className="bg-surface-container focus:border-primary w-full rounded-xl border border-transparent px-3 py-2.5 text-sm shadow-sm transition-all focus:outline-none"
                         >
@@ -451,7 +471,7 @@ export default function Products({
                         {selectedCategory !== 'all' ? (
                             <button
                                 type="button"
-                                onClick={() => setSelectedCategory('all')}
+                                onClick={() => handleCategoryChange('all')}
                                 className="bg-surface-container text-on-surface rounded-lg px-3 py-1.5 text-xs font-semibold hover:brightness-95"
                             >
                                 Reset
@@ -593,6 +613,8 @@ export default function Products({
                     title="Tambah Produk"
                     submitLabel="Simpan Produk"
                     categories={categories}
+                    brands={brands}
+                    onBrandsChange={setBrands}
                     data={createForm.data}
                     errors={createForm.errors}
                     processing={createForm.processing}
@@ -607,6 +629,8 @@ export default function Products({
                     title={`Edit ${editingProduct.name}`}
                     submitLabel="Perbarui Produk"
                     categories={categories}
+                    brands={brands}
+                    onBrandsChange={setBrands}
                     data={editForm.data}
                     errors={editForm.errors}
                     processing={editForm.processing}
@@ -651,6 +675,8 @@ interface ProductFormModalProps {
     title: string;
     submitLabel: string;
     categories: AdminCategoryOption[];
+    brands: BrandOption[];
+    onBrandsChange: (brands: BrandOption[]) => void;
     data: ProductFormData;
     errors: Record<string, string | undefined>;
     processing: boolean;
@@ -666,6 +692,8 @@ function ProductFormModal({
     title,
     submitLabel,
     categories,
+    brands,
+    onBrandsChange,
     data,
     errors,
     processing,
@@ -673,12 +701,13 @@ function ProductFormModal({
     onSubmit,
     onClose,
 }: ProductFormModalProps) {
+    const [showBrandManager, setShowBrandManager] = useState(false);
 
     const [inputModal, setInputModal] = useState<{
         open: boolean;
         title: string;
         description: string;
-        type: 'type' | 'option' | 'price' | 'stock' | 'alert';
+        type: 'type' | 'option' | 'price' | 'stock' | 'size_guide_column' | 'alert';
         value: string;
         target: string;
     }>({
@@ -712,6 +741,18 @@ function ProductFormModal({
             if (value) onChange('variants', data.variants.map(v => ({ ...v, price: value })));
         } else if (type === 'stock') {
             if (value) onChange('variants', data.variants.map(v => ({ ...v, stock: value })));
+        } else if (type === 'size_guide_column') {
+            const columnName = value.trim();
+            if (columnName !== '') {
+                const newCols = [...data.size_guide_columns, columnName];
+                onChange('size_guide_columns', newCols);
+
+                const newRows = data.size_guide_rows.map((row) => ({
+                    ...row,
+                    values: [...row.values, ''],
+                }));
+                onChange('size_guide_rows', newRows);
+            }
         }
         closeInputModal();
     };
@@ -815,6 +856,17 @@ function ProductFormModal({
         });
     };
 
+    const openSizeGuideColumnModal = () => {
+        setInputModal({
+            open: true,
+            title: 'Tambah Kolom Panduan Ukuran',
+            description: 'Masukkan nama kolom dimensi (cth: Lebar, Panjang, Lingkar Pinggang).',
+            type: 'size_guide_column',
+            value: '',
+            target: '',
+        });
+    };
+
     const removeExistingImage = (index: number) => {
         onChange(
             'images_preview',
@@ -893,6 +945,34 @@ function ProductFormModal({
                             ))}
                         </select>
                     </Field>
+
+                    <Field label="Merek" error={errors.brand_id}>
+                        <div className="flex items-center gap-2">
+                            <select
+                                value={data.brand_id}
+                                onChange={(event) =>
+                                    onChange('brand_id', event.target.value)
+                                }
+                                className="bg-surface-container focus:border-primary w-full rounded-xl border border-transparent px-3 py-2.5 text-sm focus:outline-none"
+                            >
+                                <option value="">Tanpa Merek</option>
+                                {brands.map((brand) => (
+                                    <option key={brand.id} value={brand.id}>
+                                        {brand.kode}{brand.keterangan ? ` — ${brand.keterangan}` : ''}
+                                    </option>
+                                ))}
+                            </select>
+                            <button
+                                type="button"
+                                onClick={() => setShowBrandManager(true)}
+                                className="bg-surface-container hover:bg-surface-container-high text-on-surface-variant shrink-0 rounded-xl p-2.5 transition-colors"
+                                title="Kelola Merek"
+                            >
+                                <Settings2 className="h-4 w-4" />
+                            </button>
+                        </div>
+                    </Field>
+
                     <Field
                         label="Minimal Quantity"
                         error={errors.min_order_qty}
@@ -1178,6 +1258,117 @@ function ProductFormModal({
                     </div>
                 </div>
 
+                {/* Panduan Ukuran */}
+                <div className="mt-4 rounded-xl border border-surface-container-highest p-4 bg-surface-container-lowest">
+                    <div className="flex items-center justify-between mb-4">
+                        <h3 className="font-headline text-lg font-bold">Panduan Ukuran</h3>
+                        <div className="flex gap-2">
+                            <button
+                                type="button"
+                                onClick={openSizeGuideColumnModal}
+                                className="bg-surface-container hover:bg-surface-container-high text-on-surface inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-bold transition-colors"
+                            >
+                                <Plus className="h-3 w-3" /> Kolom
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    onChange('size_guide_rows', [
+                                        ...data.size_guide_rows,
+                                        { label: '', values: data.size_guide_columns.map(() => '') },
+                                    ]);
+                                }}
+                                disabled={data.size_guide_columns.length === 0}
+                                className="bg-primary text-white hover:brightness-110 inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-bold transition-all disabled:opacity-40"
+                            >
+                                <Plus className="h-3 w-3" /> Baris
+                            </button>
+                        </div>
+                    </div>
+
+                    {data.size_guide_columns.length === 0 ? (
+                        <p className="text-sm text-on-surface-variant italic">Belum ada panduan ukuran. Mulai dengan menambahkan kolom dimensi.</p>
+                    ) : (
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-sm">
+                                <thead>
+                                    <tr className="border-b border-surface-container-highest">
+                                        <th className="py-2 pr-2 text-left font-semibold text-on-surface-variant">Ukuran</th>
+                                        {data.size_guide_columns.map((col, ci) => (
+                                            <th key={ci} className="py-2 px-2 text-left">
+                                                <div className="flex items-center gap-1">
+                                                    <span className="font-semibold text-on-surface-variant">{col}</span>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            const newCols = data.size_guide_columns.filter((_, i) => i !== ci);
+                                                            onChange('size_guide_columns', newCols);
+                                                            const newRows = data.size_guide_rows.map(r => ({
+                                                                ...r,
+                                                                values: r.values.filter((_, i) => i !== ci),
+                                                            }));
+                                                            onChange('size_guide_rows', newRows);
+                                                        }}
+                                                        className="text-on-surface-variant/50 hover:text-red-500 p-0.5"
+                                                    >
+                                                        <X className="h-3 w-3" />
+                                                    </button>
+                                                </div>
+                                            </th>
+                                        ))}
+                                        <th className="py-2 w-8"></th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {data.size_guide_rows.map((row, ri) => (
+                                        <tr key={ri} className="border-b border-surface-container-highest/50">
+                                            <td className="py-1.5 pr-2">
+                                                <input
+                                                    placeholder="S, M, L..."
+                                                    value={row.label}
+                                                    onChange={(e) => {
+                                                        const newRows = [...data.size_guide_rows];
+                                                        newRows[ri] = { ...newRows[ri], label: e.target.value };
+                                                        onChange('size_guide_rows', newRows);
+                                                    }}
+                                                    className="bg-surface-container focus:border-primary w-full min-w-[60px] rounded-lg border border-transparent px-2 py-1.5 text-sm font-semibold focus:outline-none"
+                                                />
+                                            </td>
+                                            {row.values.map((val, vi) => (
+                                                <td key={vi} className="py-1.5 px-2">
+                                                    <input
+                                                        placeholder="30 cm"
+                                                        value={val}
+                                                        onChange={(e) => {
+                                                            const newRows = [...data.size_guide_rows];
+                                                            const newValues = [...newRows[ri].values];
+                                                            newValues[vi] = e.target.value;
+                                                            newRows[ri] = { ...newRows[ri], values: newValues };
+                                                            onChange('size_guide_rows', newRows);
+                                                        }}
+                                                        className="bg-surface-container focus:border-primary w-full min-w-[70px] rounded-lg border border-transparent px-2 py-1.5 text-sm focus:outline-none"
+                                                    />
+                                                </td>
+                                            ))}
+                                            <td className="py-1.5">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        onChange('size_guide_rows', data.size_guide_rows.filter((_, i) => i !== ri));
+                                                    }}
+                                                    className="text-on-surface-variant/50 hover:text-red-500 p-1"
+                                                >
+                                                    <Trash2 className="h-3.5 w-3.5" />
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
+                </div>
+
                 <div className="mt-4">
                     <Field label="Deskripsi" error={errors.description}>
                         <textarea
@@ -1280,6 +1471,14 @@ function ProductFormModal({
                     </div>
                 </div>
             </AppModal>
+
+            {showBrandManager && (
+                <BrandManagerModal
+                    brands={brands}
+                    onBrandsChange={onBrandsChange}
+                    onClose={() => setShowBrandManager(false)}
+                />
+            )}
         </div>
     );
 }
@@ -1345,5 +1544,195 @@ function ToggleSwitch({
                 )}
             </div>
         </button>
+    );
+}
+
+function BrandManagerModal({
+    brands,
+    onBrandsChange,
+    onClose,
+}: {
+    brands: BrandOption[];
+    onBrandsChange: (brands: BrandOption[]) => void;
+    onClose: () => void;
+}) {
+    const [kode, setKode] = useState('');
+    const [keterangan, setKeterangan] = useState('');
+    const [editingId, setEditingId] = useState<number | null>(null);
+    const [error, setError] = useState('');
+    const [loading, setLoading] = useState(false);
+    const [searchTerm, setSearchTerm] = useState('');
+
+    const csrfToken = (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)?.content ?? '';
+
+    const resetForm = () => {
+        setKode('');
+        setKeterangan('');
+        setEditingId(null);
+        setError('');
+    };
+
+    const fetchBrands = async () => {
+        const res = await fetch('/admin/brands', { headers: { Accept: 'application/json' } });
+        const json = await res.json();
+        onBrandsChange(json.data);
+    };
+
+    const handleSave = async () => {
+        if (!kode.trim()) {
+            setError('Kode merek wajib diisi.');
+            return;
+        }
+        setLoading(true);
+        setError('');
+        try {
+            const url = editingId ? `/admin/brands/${editingId}` : '/admin/brands';
+            const method = editingId ? 'PUT' : 'POST';
+            const res = await fetch(url, {
+                method,
+                headers: {
+                    'Content-Type': 'application/json',
+                    Accept: 'application/json',
+                    'X-CSRF-TOKEN': csrfToken,
+                },
+                body: JSON.stringify({ kode: kode.trim(), keterangan: keterangan.trim() }),
+            });
+            if (!res.ok) {
+                const json = await res.json();
+                setError(json.message || 'Gagal menyimpan merek.');
+                return;
+            }
+            await fetchBrands();
+            resetForm();
+        } catch {
+            setError('Terjadi kesalahan jaringan.');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleEdit = (brand: BrandOption) => {
+        setEditingId(brand.id);
+        setKode(brand.kode);
+        setKeterangan(brand.keterangan);
+        setError('');
+    };
+
+    const handleDelete = async (id: number) => {
+        setLoading(true);
+        try {
+            await fetch(`/admin/brands/${id}`, {
+                method: 'DELETE',
+                headers: { Accept: 'application/json', 'X-CSRF-TOKEN': csrfToken },
+            });
+            await fetchBrands();
+            if (editingId === id) resetForm();
+        } catch {
+            setError('Gagal menghapus merek.');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const filteredBrands = brands.filter(
+        (brand) =>
+            brand.kode.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            (brand.keterangan?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false)
+    );
+
+    return (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 px-4">
+            <div className="bg-surface-container-lowest max-h-[80vh] w-full max-w-md overflow-y-auto rounded-2xl border border-black/5 p-5 shadow-2xl">
+                <div className="mb-4 flex items-center justify-between">
+                    <h3 className="font-headline text-on-surface text-lg font-black">Kelola Merek</h3>
+                    <button type="button" onClick={onClose} className="text-on-surface-variant hover:bg-surface-container rounded-lg p-2">
+                        <X className="h-4 w-4" />
+                    </button>
+                </div>
+
+                {/* Form */}
+                <div className="mb-4 space-y-2">
+                    <input
+                        placeholder="Kode Merek (cth: GRD)"
+                        value={kode}
+                        onChange={(e) => setKode(e.target.value)}
+                        className="bg-surface-container focus:border-primary w-full rounded-xl border border-transparent px-3 py-2.5 text-sm focus:outline-none"
+                    />
+                    <input
+                        placeholder="Keterangan (opsional)"
+                        value={keterangan}
+                        onChange={(e) => setKeterangan(e.target.value)}
+                        className="bg-surface-container focus:border-primary w-full rounded-xl border border-transparent px-3 py-2.5 text-sm focus:outline-none"
+                    />
+                    {error && <p className="text-xs font-medium text-red-500">{error}</p>}
+                    <div className="flex gap-2">
+                        {editingId && (
+                            <button
+                                type="button"
+                                onClick={resetForm}
+                                className="bg-surface-container text-on-surface rounded-xl px-4 py-2 text-sm font-semibold"
+                            >
+                                Batal
+                            </button>
+                        )}
+                        <button
+                            type="button"
+                            onClick={handleSave}
+                            disabled={loading}
+                            className="bg-primary rounded-xl px-4 py-2 text-sm font-bold text-white disabled:opacity-60"
+                        >
+                            {editingId ? 'Perbarui' : 'Tambah'}
+                        </button>
+                    </div>
+                </div>
+
+                {/* Search */}
+                <div className="mb-4 relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-on-surface-variant" />
+                    <input
+                        placeholder="Cari merek..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="bg-surface-container focus:border-primary w-full pl-9 pr-3 py-2 rounded-xl border border-transparent text-sm focus:outline-none"
+                    />
+                </div>
+
+                {/* List */}
+                <div className="divide-surface-container-highest divide-y">
+                    {filteredBrands.length === 0 ? (
+                        <p className="text-on-surface-variant py-4 text-center text-sm italic">
+                            {searchTerm ? 'Merek tidak ditemukan.' : 'Belum ada merek.'}
+                        </p>
+                    ) : (
+                        filteredBrands.map((brand) => (
+                            <div key={brand.id} className="flex items-center justify-between py-2.5">
+                                <div>
+                                    <p className="text-on-surface text-sm font-semibold">{brand.kode}</p>
+                                    {brand.keterangan && (
+                                        <p className="text-on-surface-variant text-xs">{brand.keterangan}</p>
+                                    )}
+                                </div>
+                                <div className="flex items-center gap-1">
+                                    <button
+                                        type="button"
+                                        onClick={() => handleEdit(brand)}
+                                        className="text-on-surface-variant hover:bg-surface-container rounded-lg p-1.5"
+                                    >
+                                        <Pencil className="h-3.5 w-3.5" />
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => handleDelete(brand.id)}
+                                        className="text-primary hover:bg-primary-fixed rounded-lg p-1.5"
+                                    >
+                                        <Trash2 className="h-3.5 w-3.5" />
+                                    </button>
+                                </div>
+                            </div>
+                        ))
+                    )}
+                </div>
+            </div>
+        </div>
     );
 }

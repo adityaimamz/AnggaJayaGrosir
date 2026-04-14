@@ -16,7 +16,7 @@ final class ProductController extends Controller
         $product = Product::query()
             ->where('slug', $slug)
             ->where('is_active', true)
-            ->with('category:id,name,slug')
+            ->with(['category:id,name,slug', 'brand:id,kode,keterangan'])
             ->firstOrFail();
 
         return Inertia::render('ProductDetail', [

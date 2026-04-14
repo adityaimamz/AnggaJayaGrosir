@@ -1,6 +1,6 @@
 import { RotateCcw, X, ZoomIn, ZoomOut } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 
 interface ImageLightboxProps {
     readonly src: string | null;
@@ -15,10 +15,15 @@ export default function ImageLightbox({ src, alt, isOpen, onClose }: ImageLightb
     const [isDragging, setIsDragging] = useState(false);
     const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
 
+    // Pinch-to-zoom refs
+    const lastPinchDistRef = useRef<number | null>(null);
+    const pinchStartZoomRef = useRef(1);
+
     useEffect(() => {
         if (!isOpen) {
             setZoom(1);
             setPosition({ x: 0, y: 0 });
+            lastPinchDistRef.current = null;
         }
     }, [isOpen]);
 
@@ -69,8 +74,23 @@ export default function ImageLightbox({ src, alt, isOpen, onClose }: ImageLightb
 
     const handleMouseUp = () => setIsDragging(false);
 
+    // Calculate distance between two touch points
+    const getTouchDistance = useCallback((touches: React.TouchList | TouchList): number => {
+        const dx = touches[1].clientX - touches[0].clientX;
+        const dy = touches[1].clientY - touches[0].clientY;
+        return Math.sqrt(dx * dx + dy * dy);
+    }, []);
+
     const handleTouchStart = (e: React.TouchEvent<HTMLButtonElement>) => {
-        if (zoom > 1) {
+        if (e.touches.length === 2) {
+            // Pinch start
+            e.preventDefault();
+            const dist = getTouchDistance(e.touches);
+            lastPinchDistRef.current = dist;
+            pinchStartZoomRef.current = zoom;
+            setIsDragging(false); // stop drag when pinching
+        } else if (e.touches.length === 1 && zoom > 1) {
+            // Single finger drag
             const touch = e.touches[0];
             setIsDragging(true);
             setDragStart({
@@ -81,13 +101,35 @@ export default function ImageLightbox({ src, alt, isOpen, onClose }: ImageLightb
     };
 
     const handleTouchMove = (e: React.TouchEvent<HTMLButtonElement>) => {
-        if (isDragging && zoom > 1) {
+        if (e.touches.length === 2) {
+            // Pinch move
+            e.preventDefault();
+            const dist = getTouchDistance(e.touches);
+            if (lastPinchDistRef.current !== null) {
+                const scale = dist / lastPinchDistRef.current;
+                const newZoom = Math.min(Math.max(pinchStartZoomRef.current * scale, 1), 4);
+                setZoom(newZoom);
+                if (newZoom <= 1) {
+                    setPosition({ x: 0, y: 0 });
+                }
+            }
+        } else if (isDragging && zoom > 1 && e.touches.length === 1) {
+            // Single finger drag
             e.preventDefault();
             const touch = e.touches[0];
             setPosition({
                 x: touch.clientX - dragStart.x,
                 y: touch.clientY - dragStart.y,
             });
+        }
+    };
+
+    const handleTouchEnd = (e: React.TouchEvent<HTMLButtonElement>) => {
+        if (e.touches.length < 2) {
+            lastPinchDistRef.current = null;
+        }
+        if (e.touches.length === 0) {
+            setIsDragging(false);
         }
     };
 
@@ -143,8 +185,8 @@ export default function ImageLightbox({ src, alt, isOpen, onClose }: ImageLightb
                         onKeyDown={handleViewportKeyDown}
                         onTouchStart={handleTouchStart}
                         onTouchMove={handleTouchMove}
-                        onTouchEnd={handleMouseUp}
-                        onTouchCancel={handleMouseUp}
+                        onTouchEnd={handleTouchEnd}
+                        onTouchCancel={handleTouchEnd}
                     >
                         <motion.div
                             animate={{ 
@@ -206,9 +248,13 @@ export default function ImageLightbox({ src, alt, isOpen, onClose }: ImageLightb
                     </motion.div>
 
                     {/* Hint */}
-                    {zoom > 1 && (
+                    {zoom > 1 ? (
                         <div className="absolute bottom-10 left-1/2 -translate-x-1/2 text-xs font-medium text-white/50 tracking-wider uppercase">
-                            Klik dan geser untuk melihat detail
+                            Geser untuk melihat detail
+                        </div>
+                    ) : (
+                        <div className="absolute bottom-10 left-1/2 -translate-x-1/2 text-xs font-medium text-white/50 tracking-wider uppercase sm:hidden">
+                            Cubit untuk zoom
                         </div>
                     )}
                 </motion.div>

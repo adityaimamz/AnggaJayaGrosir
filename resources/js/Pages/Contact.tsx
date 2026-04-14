@@ -70,7 +70,7 @@ export default function Contact() {
                             <p>Ruko Pasar Jati Baru Blok B No. 15-16, Tangerang</p>
                             <p className="inline-flex items-center gap-2">
                                 <PhoneCall className="h-4 w-4" />
-                                0812-2182-7745 (Admin)
+                                0851-3384-2671 (Admin)
                             </p>
                         </div>
                         <motion.div

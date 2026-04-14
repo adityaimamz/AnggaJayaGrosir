@@ -10,9 +10,11 @@ import {
     MessageCircle,
     Minus,
     Plus,
+    Ruler,
     Search,
     ShoppingBag,
     Star,
+    X,
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useMemo, useState } from 'react';
@@ -93,6 +95,7 @@ export default function ProductDetail({ product }: ProductDetailProps) {
     const [showAddedModal, setShowAddedModal] = useState(false);
     const [showCheckoutModal, setShowCheckoutModal] = useState(false);
     const [showLightbox, setShowLightbox] = useState(false);
+    const [showSizeGuide, setShowSizeGuide] = useState(false);
 
     const addToCart = () => {
         const saved = localStorage.getItem('cart_items');
@@ -217,10 +220,27 @@ export default function ProductDetail({ product }: ProductDetailProps) {
                         <motion.h1
                             initial={{ opacity: 0, x: 20 }}
                             animate={{ opacity: 1, x: 0 }}
-                            className="font-headline text-on-surface mb-4 text-4xl leading-tight font-extrabold tracking-tight md:text-5xl"
+                            className="font-headline text-on-surface mb-2 text-4xl leading-tight font-extrabold tracking-tight md:text-5xl"
                         >
                             {product.name}
                         </motion.h1>
+
+                        <div className="mb-6 flex flex-wrap gap-x-6 gap-y-2">
+                            <div className="flex items-center gap-2 text-sm text-on-surface-variant">
+                                <span className="font-semibold text-on-surface">Kategori:</span>
+                                <Link href={`/products?category=${product.category?.slug}`} className="text-primary hover:underline font-medium">
+                                    {product.category?.name}
+                                </Link>
+                            </div>
+                            {product.brand && (
+                                <div className="flex items-center gap-2 text-sm text-on-surface-variant">
+                                    <span className="font-semibold text-on-surface">Merek:</span>
+                                    <Link href={`/products?brand=${product.brand.kode}`} className="text-primary hover:underline font-medium">
+                                        {product.brand.kode}
+                                    </Link>
+                                </div>
+                            )}
+                        </div>
 
                         <div className="mb-8 flex items-center gap-3">
                             {badgeLabels.length > 0 && (
@@ -281,8 +301,13 @@ export default function ProductDetail({ product }: ProductDetailProps) {
                                             <span className="text-on-surface text-lg font-bold">
                                                 Pilih {typeName}
                                             </span>
-                                            {typeName.toLowerCase() === 'ukuran' && (
-                                                <button className="text-primary text-sm font-bold underline">
+                                            {typeName.toLowerCase() === 'ukuran' && product.sizeGuide && product.sizeGuide.columns.length > 0 && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setShowSizeGuide(true)}
+                                                    className="text-primary text-sm font-bold underline inline-flex items-center gap-1"
+                                                >
+                                                    <Ruler className="h-3.5 w-3.5" />
                                                     Panduan Ukuran
                                                 </button>
                                             )}
@@ -479,6 +504,56 @@ export default function ProductDetail({ product }: ProductDetailProps) {
                 alt={product.name}
                 onClose={() => setShowLightbox(false)}
             />
+
+            {/* Size Guide Modal */}
+            {showSizeGuide && product.sizeGuide && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4 backdrop-blur-sm">
+                    <motion.div
+                        initial={{ opacity: 0, scale: 0.95 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        className="bg-surface-container-lowest max-h-[80vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-black/5 p-6 shadow-2xl"
+                    >
+                        <div className="mb-5 flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                                <Ruler className="text-primary h-5 w-5" />
+                                <h3 className="font-headline text-on-surface text-lg font-black">Panduan Ukuran</h3>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setShowSizeGuide(false)}
+                                className="text-on-surface-variant hover:bg-surface-container rounded-lg p-2 transition-colors"
+                            >
+                                <X className="h-5 w-5" />
+                            </button>
+                        </div>
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-sm">
+                                <thead>
+                                    <tr className="border-b-2 border-primary/20">
+                                        <th className="text-primary py-3 pr-4 text-left text-xs font-bold tracking-wider uppercase">Ukuran</th>
+                                        {product.sizeGuide.columns.map((col) => (
+                                            <th key={col} className="text-on-surface-variant py-3 px-3 text-left text-xs font-bold tracking-wider uppercase">{col}</th>
+                                        ))}
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {product.sizeGuide.rows.map((row, i) => (
+                                        <tr key={i} className="border-b border-surface-container-highest hover:bg-surface-container-low transition-colors">
+                                            <td className="text-on-surface py-3 pr-4 font-bold">{row.label}</td>
+                                            {row.values.map((val, vi) => (
+                                                <td key={vi} className="text-on-surface-variant py-3 px-3">{val || '-'}</td>
+                                            ))}
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                        <p className="text-on-surface-variant mt-4 text-center text-xs italic">
+                            * Ukuran dapat sedikit berbeda tergantung produksi
+                        </p>
+                    </motion.div>
+                </div>
+            )}
         </PublicLayout>
     );
 }

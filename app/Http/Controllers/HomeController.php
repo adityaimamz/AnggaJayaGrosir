@@ -7,6 +7,8 @@ namespace App\Http\Controllers;
 use App\Data\PaginatedData;
 use App\Http\Resources\CategoryResource;
 use App\Http\Resources\ProductSummaryResource;
+use App\Models\Banner;
+use App\Models\Brand;
 use App\Models\Category;
 use App\Models\Product;
 use Illuminate\Http\Request;
@@ -19,6 +21,7 @@ final class HomeController extends Controller
     {
         $search = trim((string) $request->query('search', ''));
         $category = trim((string) $request->query('category', ''));
+        $brand = trim((string) $request->query('brand', ''));
         $sort = trim((string) $request->query('sort', 'newest'));
 
         $products = Product::query()
@@ -32,6 +35,7 @@ final class HomeController extends Controller
                 });
             })
             ->when($category !== '', static fn ($query) => $query->whereHas('category', static fn ($categoryQuery) => $categoryQuery->where('slug', $category)))
+            ->when($brand !== '', static fn ($query) => $query->whereHas('brand', static fn ($brandQuery) => $brandQuery->where('kode', $brand)))
             ->when($sort === 'best_seller', static fn ($query) => $query->where('is_best_seller', true)->latest())
             ->when($sort === 'newest', static fn ($query) => $query->latest())
             ->when(!in_array($sort, ['newest', 'best_seller']), static fn ($query) => $query->latest())
@@ -49,12 +53,25 @@ final class HomeController extends Controller
             ->get(['id', 'name', 'slug'])
             ->map(static fn (Category $category): array => CategoryResource::make($category)->resolve());
 
+        $brands = Brand::query()
+            ->orderBy('kode')
+            ->get(['id', 'kode', 'keterangan']);
+
+        $banners = Banner::query()
+            ->where('is_active', true)
+            ->orderBy('sort_order')
+            ->orderBy('id', 'desc')
+            ->get(['id', 'image_path']);
+
         return Inertia::render('PublicHome', [
+            'banners' => $banners,
             'products' => PaginatedData::fromLengthAwarePaginator($products)->toArray(),
             'categories' => $categories,
+            'brands' => $brands,
             'filters' => [
                 'search' => $search,
                 'category' => $category,
+                'brand' => $brand,
                 'sort' => $sort,
             ],
         ]);

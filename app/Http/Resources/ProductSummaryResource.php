@@ -33,6 +33,9 @@ class ProductSummaryResource extends JsonResource
             'category' => $this->relationLoaded('category') && $this->category
                 ? CategoryResource::make($this->category)->resolve()
                 : null,
+            'brand' => $this->relationLoaded('brand') && $this->brand
+                ? ['kode' => $this->brand->kode, 'keterangan' => $this->brand->keterangan]
+                : null,
         ];
     }
 

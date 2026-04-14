@@ -9,6 +9,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\StoreProductRequest;
 use App\Http\Requests\Admin\UpdateProductRequest;
 use App\Http\Resources\AdminProductResource;
+use App\Models\Brand;
 use App\Models\Category;
 use App\Models\Product;
 use App\Support\ImageOptimizer;
@@ -26,12 +27,12 @@ final class ProductManagementController extends Controller
 
     public function index(Request $request): Response
     {
-        $categoryId = (int) $request->query('category_id', 0);
-        $search = trim((string) $request->query('search', ''));
+        $categoryId = (int) $request->input('category_id', 0);
+        $search = trim((string) $request->input('search', ''));
         $escapedSearch = str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $search);
 
         $products = Product::query()
-            ->with('category:id,name,slug')
+            ->with(['category:id,name,slug', 'brand:id,kode'])
             ->when($search !== '', static function ($query) use ($escapedSearch): void {
                 $query->where(static function ($subQuery) use ($escapedSearch): void {
                     $subQuery->where('name', 'like', "%{$escapedSearch}%")
@@ -53,6 +54,7 @@ final class ProductManagementController extends Controller
         return Inertia::render('Admin/Products', [
             'products' => PaginatedData::fromLengthAwarePaginator($products)->toArray(),
             'categories' => Category::query()->orderBy('name')->get(['id', 'name']),
+            'brands' => Brand::query()->orderBy('kode')->get(['id', 'kode', 'keterangan']),
             'filters' => [
                 'category_id' => $categoryId > 0 ? $categoryId : null,
                 'search' => $search !== '' ? $search : null,
@@ -78,7 +80,7 @@ final class ProductManagementController extends Controller
         ]);
 
         return redirect()
-            ->route('admin.products.index')
+            ->to($this->buildRedirectUrl($request))
             ->with('success', 'Produk berhasil ditambahkan.');
     }
 
@@ -102,11 +104,11 @@ final class ProductManagementController extends Controller
         ]);
 
         return redirect()
-            ->route('admin.products.index')
+            ->to($this->buildRedirectUrl($request))
             ->with('success', 'Produk berhasil diperbarui.');
     }
 
-    public function destroy(Product $product): RedirectResponse
+    public function destroy(Request $request, Product $product): RedirectResponse
     {
         $paths = array_values(array_filter(is_array($product->images) ? $product->images : [$product->image]));
         $this->imageOptimizer->deleteMany($paths, $this->disk());
@@ -114,7 +116,7 @@ final class ProductManagementController extends Controller
         $product->delete();
 
         return redirect()
-            ->route('admin.products.index')
+            ->to($this->buildRedirectUrl($request))
             ->with('success', 'Produk berhasil dihapus.');
     }
 
@@ -125,6 +127,7 @@ final class ProductManagementController extends Controller
 
         return [
             'category_id' => (int) $validated['category_id'],
+            'brand_id' => isset($validated['brand_id']) ? (int) $validated['brand_id'] : null,
             'name' => $validated['name'],
             'slug' => $validated['slug'],
             'min_price' => (float) $minPrice,
@@ -139,6 +142,7 @@ final class ProductManagementController extends Controller
             'is_active' => (bool) ($validated['is_active'] ?? true),
             'features' => $validated['features'] ?? [],
             'feature_descriptions' => $validated['feature_descriptions'] ?? [],
+            'size_guide' => $validated['size_guide'] ?? null,
         ];
     }
 
@@ -186,5 +190,26 @@ final class ProductManagementController extends Controller
     private function disk(): string
     {
         return (string) config('media.disk', 'public');
+    }
+
+    private function buildRedirectUrl(Request $request): string
+    {
+        $params = [];
+
+        $categoryId = (int) $request->input('_filter_category_id', $request->input('category_id', 0));
+        if ($categoryId > 0) {
+            $params['category_id'] = $categoryId;
+        }
+
+        $search = trim((string) $request->input('_filter_search', $request->input('search', '')));
+        if ($search !== '') {
+            $params['search'] = $search;
+        }
+
+        $base = route('admin.products.index');
+
+        return count($params) > 0
+            ? $base . '?' . http_build_query($params)
+            : $base;
     }
 }

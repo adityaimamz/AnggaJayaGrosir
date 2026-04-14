@@ -30,12 +30,19 @@ export interface ProductSummary {
     isNew: boolean;
     isBestSeller: boolean;
     category: CategorySummary;
+    brand?: { kode: string; keterangan: string } | null;
+}
+
+export interface SizeGuide {
+    columns: string[];
+    rows: { label: string; values: string[] }[];
 }
 
 export interface ProductDetail extends ProductSummary {
     description: string | null;
     features: string[];
     featureDescriptions: string[];
+    sizeGuide?: SizeGuide | null;
     stock?: number; // fallback for backwards comp during refactor (though not used)
     totalStock: number;
 }
@@ -73,12 +80,21 @@ export interface AdminProductRow {
     isNew?: boolean;
     isBestSeller?: boolean;
     isActive?: boolean;
+    brandId?: number | null;
+    brandKode?: string | null;
+    sizeGuide?: SizeGuide | null;
     category: CategorySummary;
 }
 
 export interface AdminCategoryOption {
     id: number;
     name: string;
+}
+
+export interface BrandOption {
+    id: number;
+    kode: string;
+    keterangan: string;
 }
 
 export interface WhatsappOrderItem {
@@ -119,4 +135,11 @@ export interface LengthAwarePaginated<T> {
     from: number | null;
     to: number | null;
     links: PaginatorLink[];
+}
+
+export interface Banner {
+    id: number;
+    image_url: string;
+    sort_order: number;
+    is_active: boolean;
 }

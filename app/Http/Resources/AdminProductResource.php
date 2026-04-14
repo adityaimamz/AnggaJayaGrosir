@@ -23,6 +23,9 @@ final class AdminProductResource extends ProductSummaryResource
             'isNew' => $this->is_new,
             'isBestSeller' => $this->is_best_seller,
             'isActive' => (bool) ($this->is_active ?? true),
+            'brandId' => $this->brand_id,
+            'brandKode' => $this->brand?->kode,
+            'sizeGuide' => $this->size_guide,
         ];
     }
 

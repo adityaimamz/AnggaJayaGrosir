@@ -12,14 +12,15 @@ class Product extends Model
     use HasFactory;
 
     protected $fillable = [
-        'category_id', 'name', 'slug', 'min_price', 'image', 'description',
-        'images', 'features', 'feature_descriptions', 'variant_types', 'variants', 'min_order', 'min_order_qty', 'badge', 'is_new', 'is_best_seller', 'is_active',
+        'category_id', 'brand_id', 'name', 'slug', 'min_price', 'image', 'description',
+        'images', 'features', 'feature_descriptions', 'size_guide', 'variant_types', 'variants', 'min_order', 'min_order_qty', 'badge', 'is_new', 'is_best_seller', 'is_active',
     ];
 
     protected $casts = [
         'images' => 'array',
         'features' => 'array',
         'feature_descriptions' => 'array',
+        'size_guide' => 'array',
         'variant_types' => 'array',
         'variants' => 'array',
         'is_new' => 'boolean',
@@ -65,5 +66,10 @@ class Product extends Model
     public function category()
     {
         return $this->belongsTo(Category::class);
+    }
+
+    public function brand()
+    {
+        return $this->belongsTo(Brand::class);
     }
 }

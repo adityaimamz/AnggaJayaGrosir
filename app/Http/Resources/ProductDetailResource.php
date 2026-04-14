@@ -21,6 +21,7 @@ final class ProductDetailResource extends ProductSummaryResource
             'totalStock' => $this->total_stock,
             'isNew' => $this->is_new,
             'isBestSeller' => $this->is_best_seller,
+            'sizeGuide' => $this->size_guide,
         ];
     }
 }
