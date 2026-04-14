@@ -14,7 +14,7 @@ import {
     Tag,
 } from 'lucide-react';
 import { motion } from 'motion/react';
-import { useEffect, useState, Fragment } from 'react';
+import { useEffect, useRef, useState, Fragment } from 'react';
 import { Menu, Transition } from '@headlessui/react';
 
 interface HomeProps {
@@ -38,12 +38,13 @@ export default function Home({
     const [searchInput, setSearchInput] = useState(filters?.search ?? '');
     const [activeSort, setActiveSort] = useState(filters?.sort ?? 'newest');
     const [currentBannerIdx, setCurrentBannerIdx] = useState(0);
+    const previousPageRef = useRef(products.currentPage);
 
     const banners = [
         {
             id: 1,
             title: 'Step by Step Pemesanan - Langkah 1',
-            subtitle: 'Cari dan pilih produk yang Anda butuhkan dari katalog kami.',
+            subtitle: 'Cari dan pilih produk yang Anda butuhkan dari katalog kami dan tambahkan ke keranjang.',
             cta: 'Lihat Produk',
             href: '#products',
             gradient: 'from-blue-600 via-cyan-600 to-sky-500',
@@ -51,7 +52,7 @@ export default function Home({
         {
             id: 2,
             title: 'Step by Step Pemesanan - Langkah 2',
-            subtitle: 'Hubungi admin dan kirim daftar produk beserta jumlah pesanan Anda.',
+            subtitle: 'Pilih pesan via whatsapp melalui keranjang atau langsung dari produk.',
             cta: 'Siapkan Daftar Pesanan',
             href: '#products',
             gradient: 'from-emerald-600 via-teal-600 to-green-500',
@@ -59,7 +60,7 @@ export default function Home({
         {
             id: 3,
             title: 'Step by Step Pemesanan - Langkah 3',
-            subtitle: 'Lakukan konfirmasi pembayaran, lalu pesanan diproses dan dikirim.',
+            subtitle: 'Lakukan konfirmasi pembayaran dengan menyertakan invoice yang terunduh otomatis, lalu pesanan diproses dan dikirim.',
             cta: 'Mulai Pemesanan',
             href: '#products',
             gradient: 'from-orange-500 via-amber-500 to-yellow-500',
@@ -117,6 +118,20 @@ export default function Home({
         return () => window.clearTimeout(handler);
     }, [activeCategory, activeSort, filters?.category, filters?.search, filters?.sort, searchInput]);
 
+    useEffect(() => {
+        if (previousPageRef.current === products.currentPage) {
+            return;
+        }
+
+        previousPageRef.current = products.currentPage;
+
+        globalThis.requestAnimationFrame(() => {
+            document
+                .getElementById('products')
+                ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        });
+    }, [products.currentPage]);
+
     const categories = [
         { key: 'all', label: 'Semua Produk' },
         ...backendCategories.map((category) => ({
@@ -148,9 +163,9 @@ export default function Home({
 
     return (
         <PublicLayout search={searchInput} onSearchChange={setSearchInput}>
-            <div className="mx-auto max-w-[1400px] px-6 pt-28 pb-20 md:px-10">
+            <div id="banner-carousel" className="mx-auto max-w-[1400px] px-6 pt-28 pb-20 md:px-10">
                 {/* Banner Carousel */}
-                <div className="relative mb-12 h-[280px] w-full overflow-hidden rounded-3xl md:h-[360px] lg:h-[400px]">
+                <div  className="relative mb-12 h-[280px] w-full overflow-hidden rounded-3xl md:h-[360px] lg:h-[400px]">
                     {banners.map((banner, idx) => (
                         <div
                             key={banner.id}
@@ -217,11 +232,22 @@ export default function Home({
                     </div>
                 </div>
 
-                <h1 id="products" className="font-headline text-on-surface mb-8 text-3xl font-bold md:text-4xl scroll-mt-32">
+                <motion.h1
+                    id="products"
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.4 }}
+                    className="font-headline text-on-surface mb-8 text-3xl font-bold md:text-4xl scroll-mt-32"
+                >
                     Produk
-                </h1>
+                </motion.h1>
 
-                <div className="mb-10 flex flex-wrap items-center justify-between gap-4">
+                <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ delay: 0.1, duration: 0.3 }}
+                    className="mb-10 flex flex-wrap items-center justify-between gap-4"
+                >
                     <Menu as="div" className="relative">
                         <Menu.Button className="border-surface-container-highest text-on-surface-variant hover:bg-surface-container-low flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-medium whitespace-nowrap transition-colors">
                             <Tag className="h-4 w-4 shrink-0" />
@@ -305,7 +331,7 @@ export default function Home({
                             </Menu.Items>
                         </Transition>
                     </Menu>
-                </div>
+                </motion.div>
 
                 <div className="grid grid-cols-2 gap-x-6 gap-y-12 md:grid-cols-3 lg:grid-cols-4">
                     {products.data.map((product, idx) => {
@@ -398,7 +424,7 @@ export default function Home({
                                     <Link
                                         key={idx}
                                         href={link.url}
-                                        preserveScroll
+                                        onClick={() => document.getElementById('products')?.scrollIntoView({ behavior: 'smooth' })}
                                         className={`flex h-10 w-10 min-w-[40px] items-center justify-center rounded-lg border text-sm font-semibold transition-colors ${
                                             link.active
                                                 ? 'border-primary bg-primary text-white shadow-sm'
@@ -415,7 +441,7 @@ export default function Home({
                         <div className="flex flex-col sm:flex-row w-full sm:max-w-[400px] gap-3">
                             <Link
                                 href={prevHref}
-                                preserveScroll
+                                onClick={() => document.getElementById('products')?.scrollIntoView({ behavior: 'smooth' })}
                                 className={`flex flex-1 items-center justify-center gap-2 rounded-xl border px-4 py-3 text-sm font-bold transition-colors ${
                                     products.currentPage > 1
                                         ? 'border-surface-container-highest text-on-surface hover:bg-surface-container-low'
@@ -427,7 +453,7 @@ export default function Home({
 
                             <Link
                                 href={nextHref}
-                                preserveScroll
+                                onClick={() => document.getElementById('products')?.scrollIntoView({ behavior: 'smooth' })}
                                 className={`flex flex-1 items-center justify-center gap-2 rounded-xl border px-4 py-3 text-sm font-bold transition-colors ${
                                     products.currentPage < products.lastPage
                                         ? 'border-surface-container-highest text-on-surface hover:bg-surface-container-low'
@@ -441,11 +467,16 @@ export default function Home({
                 )}
 
                 {products.data.length === 0 && (
-                    <div className="py-20 text-center">
+                    <motion.div
+                        initial={{ opacity: 0, scale: 0.9 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        transition={{ duration: 0.4, type: 'spring' }}
+                        className="py-20 text-center"
+                    >
                         <p className="text-on-surface-variant text-lg">
                             Tidak ada produk dalam kategori ini.
                         </p>
-                    </div>
+                    </motion.div>
                 )}
             </div>
         </PublicLayout>

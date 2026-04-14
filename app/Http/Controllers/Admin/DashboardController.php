@@ -57,9 +57,24 @@ final class DashboardController extends Controller
             stockValue: $stockValue,
         );
 
+        $categoryComposition = Product::query()
+            ->join('categories', 'categories.id', '=', 'products.category_id')
+            ->selectRaw('categories.name as category_name, count(products.id) as product_count')
+            ->groupBy('categories.id', 'categories.name')
+            ->orderByDesc('product_count')
+            ->limit(5)
+            ->get()
+            ->map(static fn (object $row): array => [
+                'name' => (string) $row->category_name,
+                'count' => (int) $row->product_count,
+            ])
+            ->values()
+            ->all();
+
         $dashboard = new AdminDashboardData(
             stats: $stats,
             products: $products,
+            categoryComposition: $categoryComposition,
         );
 
         return Inertia::render('Admin/Dashboard', $dashboard->toArray());

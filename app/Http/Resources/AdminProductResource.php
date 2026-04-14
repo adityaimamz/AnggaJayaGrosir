@@ -15,6 +15,7 @@ final class AdminProductResource extends ProductSummaryResource
         return [
             ...parent::toArray($request),
             'totalStock' => $this->total_stock,
+            'imagePaths' => $this->resolveImagePaths(),
 
             'features' => $this->features ?? [],
             'featureDescriptions' => $this->feature_descriptions ?? [],
@@ -22,5 +23,16 @@ final class AdminProductResource extends ProductSummaryResource
             'isNew' => $this->is_new,
             'isBestSeller' => $this->is_best_seller,
         ];
+    }
+
+    private function resolveImagePaths(): array
+    {
+        $images = is_array($this->images) ? $this->images : [];
+
+        if (count($images) === 0 && is_string($this->image) && $this->image !== '') {
+            $images = [$this->image];
+        }
+
+        return array_values(array_filter($images, static fn (mixed $item): bool => is_string($item) && $item !== ''));
     }
 }

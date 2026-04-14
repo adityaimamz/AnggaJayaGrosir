@@ -28,21 +28,51 @@ export default function ProductDetail({ product }: ProductDetailProps) {
     const unitLabel = product.minOrder?.trim() || 'pack';
     const minQuantity = Math.max(1, Number(product.minOrderQty || 1));
     const badgeLabels = resolveProductBadges(product);
+    const variantTypes = product.variantTypes ?? [];
     const [quantity, setQuantity] = useState(minQuantity);
     const [selectedOptions, setSelectedOptions] = useState<Record<string, string>>(() => {
         return product.variants?.[0]?.options || {};
     });
 
-    const selectedVariant = useMemo(() => {
-        return product.variants?.find(v => {
-            return Object.entries(selectedOptions).every(
-                ([key, val]) => v.options[key] === val
-            );
-        });
-    }, [product.variants, selectedOptions]);
+    const findVariantByOptions = (options: Record<string, string>) => {
+        return product.variants?.find((variant) =>
+            variantTypes.every(
+                (typeName) => variant.options[typeName] === options[typeName],
+            ),
+        );
+    };
 
-    const selectedPrice = selectedVariant?.price ?? product.minPrice;
-    const variantLabel = Object.values(selectedOptions).join(' / ') || 'Default';
+    const selectedVariant = useMemo(() => {
+        return findVariantByOptions(selectedOptions) ?? product.variants?.[0];
+    }, [product.variants, selectedOptions, variantTypes]);
+
+    const selectedPrice = Number(selectedVariant?.price ?? product.minPrice);
+    const variantLabel =
+        variantTypes
+            .map((typeName) => selectedVariant?.options[typeName] ?? '')
+            .filter(Boolean)
+            .join(' / ') || 'Default';
+
+    const handleOptionSelect = (typeName: string, option: string) => {
+        const nextOptions = { ...selectedOptions, [typeName]: option };
+        const exactMatch = findVariantByOptions(nextOptions);
+
+        if (exactMatch) {
+            setSelectedOptions(exactMatch.options);
+            return;
+        }
+
+        const fallbackVariant = product.variants?.find(
+            (variant) => variant.options[typeName] === option,
+        );
+
+        if (fallbackVariant) {
+            setSelectedOptions(fallbackVariant.options);
+            return;
+        }
+
+        setSelectedOptions(nextOptions);
+    };
 
     const images = useMemo(() => {
         const source = Array.isArray(product.images)
@@ -118,7 +148,12 @@ export default function ProductDetail({ product }: ProductDetailProps) {
     return (
         <PublicLayout>
             <div className="mx-auto max-w-7xl px-6 pt-28 pb-20">
-                <nav className="text-on-surface-variant mb-8 flex items-center text-sm font-medium tracking-wider uppercase">
+                <motion.nav
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ duration: 0.4 }}
+                    className="text-on-surface-variant mb-8 flex items-center text-sm font-medium tracking-wider uppercase"
+                >
                     <Link
                         href="/"
                         className="hover:text-primary transition-colors"
@@ -134,7 +169,7 @@ export default function ProductDetail({ product }: ProductDetailProps) {
                     </Link>
                     <ChevronRight className="mx-2 h-4 w-4" />
                     <span className="text-on-surface">{product.name}</span>
-                </nav>
+                </motion.nav>
 
                 <div className="grid grid-cols-1 gap-12 lg:grid-cols-12">
                     {/* Product Gallery */}
@@ -157,8 +192,12 @@ export default function ProductDetail({ product }: ProductDetailProps) {
                         </motion.div>
                         <div className="grid grid-cols-4 gap-4">
                             {images.filter(Boolean).map((img, idx) => (
-                                <button
+                                <motion.button
                                     key={img}
+                                    initial={{ opacity: 0, scale: 0.8 }}
+                                    animate={{ opacity: 1, scale: 1 }}
+                                    transition={{ delay: 0.1 + idx * 0.05, duration: 0.3 }}
+                                    whileTap={{ scale: 0.95 }}
                                     onClick={() => setActiveImage(img)}
                                     className={`bg-surface-container-lowest aspect-square overflow-hidden rounded-xl border-2 transition-all ${activeImage === img ? 'border-primary' : 'hover:border-primary/50 border-transparent'}`}
                                 >
@@ -168,7 +207,7 @@ export default function ProductDetail({ product }: ProductDetailProps) {
                                         src={img}
                                         referrerPolicy="no-referrer"
                                     />
-                                </button>
+                                </motion.button>
                             ))}
                         </div>
                     </div>
@@ -204,22 +243,27 @@ export default function ProductDetail({ product }: ProductDetailProps) {
                             </div>
                         </div>
 
-                        <div className="bg-surface-container-low mb-10 rounded-2xl p-6">
+                        <motion.div
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: 0.15, duration: 0.4 }}
+                            className="bg-surface-container-low mb-10 rounded-2xl p-6"
+                        >
                             <span className="text-on-surface-variant mb-1 block text-sm font-semibold tracking-widest uppercase">
                                 Harga per {unitLabel}
                             </span>
                             <div className="text-primary font-headline text-4xl font-black">
-                                {product.minPrice === product.maxPrice
-                                    ? `Rp ${Number(product.minPrice).toLocaleString('id-ID')}`
-                                    : `Rp ${Number(product.minPrice).toLocaleString('id-ID')} – Rp ${Number(product.maxPrice).toLocaleString('id-ID')}`}
+                                Rp {selectedPrice.toLocaleString('id-ID')}
                             </div>
                             <div className="text-on-surface-variant mt-1 text-sm font-semibold">
-                                Harga pilihan: Rp {selectedPrice.toLocaleString('id-ID')}
+                                {product.minPrice === product.maxPrice
+                                    ? 'Harga tetap untuk semua variasi'
+                                    : `Rentang harga: Rp ${Number(product.minPrice).toLocaleString('id-ID')} – Rp ${Number(product.maxPrice).toLocaleString('id-ID')}`}
                             </div>
                             <p className="text-on-surface-variant mt-2 text-sm italic">
                                 Minimal order: {minQuantity} {unitLabel}
                             </p>
-                        </div>
+                        </motion.div>
 
                         <div className="space-y-8">
                             {product.variantTypes?.map((typeName) => {
@@ -247,12 +291,7 @@ export default function ProductDetail({ product }: ProductDetailProps) {
                                             {availableOptions.map((opt) => (
                                                 <button
                                                     key={opt}
-                                                    onClick={() =>
-                                                        setSelectedOptions(prev => ({
-                                                            ...prev,
-                                                            [typeName]: opt
-                                                        }))
-                                                    }
+                                                    onClick={() => handleOptionSelect(typeName, opt)}
                                                     className={`flex min-w-[64px] items-center justify-center rounded-xl border-2 px-3 py-2 text-lg font-bold transition-all ${selectedOptions[typeName] === opt ? 'border-primary bg-primary-fixed text-on-primary-fixed shadow-sm' : 'border-surface-container-highest text-on-surface hover:border-primary'}`}
                                                 >
                                                     {opt}
@@ -298,27 +337,36 @@ export default function ProductDetail({ product }: ProductDetailProps) {
 
                             {/* Action Buttons */}
                             <div className="space-y-4 pt-4">
-                                <button
+                                <motion.button
                                     onClick={addToCart}
-                                    className="bg-primary flex h-16 w-full items-center justify-center gap-3 rounded-xl text-xl font-bold text-white shadow-lg transition-all hover:brightness-110 active:scale-[0.98]"
+                                    whileHover={{ scale: 1.02 }}
+                                    whileTap={{ scale: 0.97 }}
+                                    className="bg-primary flex h-16 w-full items-center justify-center gap-3 rounded-xl text-xl font-bold text-white shadow-lg transition-all hover:brightness-110"
                                 >
                                     <ShoppingBag className="h-6 w-6" />
                                     TAMBAH KE KERANJANG
-                                </button>
-                                <button
+                                </motion.button>
+                                <motion.button
                                     type="button"
                                     onClick={orderViaWhatsapp}
-                                    className="bg-tertiary flex h-16 w-full items-center justify-center gap-3 rounded-xl text-xl font-bold text-white shadow-lg transition-all hover:brightness-110 active:scale-[0.98]"
+                                    whileHover={{ scale: 1.02 }}
+                                    whileTap={{ scale: 0.97 }}
+                                    className="bg-tertiary flex h-16 w-full items-center justify-center gap-3 rounded-xl text-xl font-bold text-white shadow-lg transition-all hover:brightness-110"
                                 >
                                     <MessageCircle className="h-6 w-6" />
                                     PESAN VIA WHATSAPP
-                                </button>
+                                </motion.button>
                             </div>
                         </div>
 
                         {/* Product Features Bento */}
                         <div className="mt-12 grid grid-cols-2 gap-4">
-                            <div className="bg-surface-container-lowest rounded-xl border border-black/5 p-4">
+                            <motion.div
+                                initial={{ opacity: 0, y: 15 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                transition={{ delay: 0.25, duration: 0.4 }}
+                                className="bg-surface-container-lowest rounded-xl border border-black/5 p-4"
+                            >
                                 <Star className="text-secondary mb-2 h-6 w-6 fill-current" />
                                 <h4 className="text-sm font-bold">
                                     Katun Premium
@@ -326,8 +374,13 @@ export default function ProductDetail({ product }: ProductDetailProps) {
                                 <p className="text-on-surface-variant text-xs">
                                     Bahan lembut dan tidak gatal.
                                 </p>
-                            </div>
-                            <div className="bg-surface-container-lowest rounded-xl border border-black/5 p-4">
+                            </motion.div>
+                            <motion.div
+                                initial={{ opacity: 0, y: 15 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                transition={{ delay: 0.35, duration: 0.4 }}
+                                className="bg-surface-container-lowest rounded-xl border border-black/5 p-4"
+                            >
                                 <CheckCircle className="text-secondary mb-2 h-6 w-6 fill-current" />
                                 <h4 className="text-sm font-bold">
                                     Grosir Ready
@@ -335,13 +388,18 @@ export default function ProductDetail({ product }: ProductDetailProps) {
                                 <p className="text-on-surface-variant text-xs">
                                     Stok aman untuk partai besar.
                                 </p>
-                            </div>
+                            </motion.div>
                         </div>
                     </div>
                 </div>
 
                 {/* Description Section */}
-                <section className="mt-32 grid grid-cols-1 gap-12 lg:grid-cols-12">
+                <motion.section
+                    initial={{ opacity: 0, y: 30 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.3, duration: 0.5 }}
+                    className="mt-32 grid grid-cols-1 gap-12 lg:grid-cols-12"
+                >
                     <div className={product.features && product.features.length > 0 ? "lg:col-span-4" : "lg:col-span-12"}>
                         <h2 className="font-headline mb-6 text-3xl font-extrabold">
                             Detail Produk
@@ -373,7 +431,7 @@ export default function ProductDetail({ product }: ProductDetailProps) {
                             </ul>
                         </div>
                     )}
-                </section>
+                </motion.section>
             </div>
 
             <AppModal

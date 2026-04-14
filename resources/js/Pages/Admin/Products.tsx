@@ -39,6 +39,7 @@ interface ProductFormData {
     variants: { options: Record<string, string>; price: string; stock: string }[];
     image_files: File[];
     images_preview: string[];
+    retained_image_paths: string[];
     description: string;
     min_order_qty: string;
     min_order: string;
@@ -63,6 +64,7 @@ const emptyForm: ProductFormData = {
     variants: [],
     image_files: [],
     images_preview: [],
+    retained_image_paths: [],
     description: '',
     min_order_qty: '1',
     min_order: '',
@@ -91,6 +93,7 @@ function toPayload(data: ProductFormData) {
         })),
         image_files: data.image_files,
         images_preview: [],
+        retained_image_paths: data.retained_image_paths,
         description: data.description || null,
         min_order_qty: Math.max(1, Number(data.min_order_qty || 1)),
         min_order: data.min_order || null,
@@ -140,6 +143,7 @@ function toEditForm(product: AdminProductRow): ProductFormData {
         })),
         image_files: [],
         images_preview: product.images ?? [],
+        retained_image_paths: product.imagePaths ?? [],
         description: product.description ?? '',
         min_order_qty: String(product.minOrderQty ?? 1),
         min_order: product.minOrder ?? '',
@@ -802,6 +806,17 @@ function ProductFormModal({
         });
     };
 
+    const removeExistingImage = (index: number) => {
+        onChange(
+            'images_preview',
+            data.images_preview.filter((_, i) => i !== index),
+        );
+        onChange(
+            'retained_image_paths',
+            data.retained_image_paths.filter((_, i) => i !== index),
+        );
+    };
+
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 px-4 py-6">
             <form
@@ -945,13 +960,22 @@ function ProductFormModal({
                         Array.isArray(data.images_preview) &&
                         data.images_preview.length > 0 ? (
                             <div className="mt-2 flex flex-wrap gap-2">
-                                {data.images_preview.map((image) => (
-                                    <img
-                                        key={image}
-                                        src={image}
-                                        alt="Product preview"
-                                        className="h-12 w-12 rounded-lg object-cover"
-                                    />
+                                {data.images_preview.map((image, index) => (
+                                    <div key={image} className="relative">
+                                        <img
+                                            src={image}
+                                            alt="Product preview"
+                                            className="h-12 w-12 rounded-lg object-cover"
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={() => removeExistingImage(index)}
+                                            className="bg-black/70 absolute -top-1 -right-1 rounded-full p-0.5 text-white"
+                                            aria-label="Hapus foto"
+                                        >
+                                            <X className="h-3 w-3" />
+                                        </button>
+                                    </div>
                                 ))}
                             </div>
                         ) : null}

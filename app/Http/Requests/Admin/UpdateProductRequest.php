@@ -31,6 +31,8 @@ final class UpdateProductRequest extends FormRequest
             ],
             'image_files' => ['nullable', 'array', 'max:5'],
             'image_files.*' => ['required', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
+            'retained_image_paths' => ['nullable', 'array', 'max:5'],
+            'retained_image_paths.*' => ['required', 'string', 'max:500'],
             'description' => ['nullable', 'string'],
             'min_order' => ['nullable', 'string', 'max:100'],
             'min_order_qty' => ['nullable', 'integer', 'min:1'],

@@ -1,10 +1,13 @@
 import PublicLayout from '@/Layouts/PublicLayout';
 import { MapPin, MessageCircle, PhoneCall } from 'lucide-react';
+import { motion } from 'motion/react';
 
 interface BranchInfo {
     name: string;
     address: string;
     mapsUrl: string;
+    imageUrl: string;
+    imageAlt: string;
 }
 
 const branches: BranchInfo[] = [
@@ -13,11 +16,15 @@ const branches: BranchInfo[] = [
         address: 'Ruko pasar Jati Baru Blok B No.15 - 16, Jatiuwung, Kota Tangerang',
         mapsUrl:
             'https://maps.app.goo.gl/xkP6w8QmWb1MMxxK7',
+        imageUrl: '/storage/branches/cabang-1.webp',
+        imageAlt: 'Foto toko Angga Jaya Cabang 1',
     },
     {
         name: 'Angga Jaya 2',
         address: 'Jl. Kampung Kadu Rt 01/Rw 02 Kec. Curug, Kab.Tangerang.',
         mapsUrl: 'https://maps.app.goo.gl/tUCGqiBfEG6iyV4t8',
+        imageUrl: '/storage/branches/cabang-2.webp',
+        imageAlt: 'Foto toko Angga Jaya Cabang 2',
     },
 ];
 
@@ -33,11 +40,26 @@ export default function Contact() {
     return (
         <PublicLayout>
             <section className="relative overflow-hidden px-6 pt-28 pb-16 md:px-10 md:pt-32 md:pb-20">
-                <div className="pointer-events-none absolute -top-20 -left-20 h-72 w-72 rounded-full bg-amber-300/20 blur-3xl" />
-                <div className="pointer-events-none absolute -right-24 -bottom-24 h-80 w-80 rounded-full bg-emerald-300/20 blur-3xl" />
+                {/* Animated Floating Blobs */}
+                <motion.div
+                    animate={{ y: [0, -15, 0], x: [0, 8, 0] }}
+                    transition={{ duration: 7, repeat: Infinity, ease: 'easeInOut' }}
+                    className="pointer-events-none absolute -top-20 -left-20 h-72 w-72 rounded-full bg-amber-300/20 blur-3xl"
+                />
+                <motion.div
+                    animate={{ y: [0, 12, 0], x: [0, -10, 0] }}
+                    transition={{ duration: 8, repeat: Infinity, ease: 'easeInOut', delay: 1 }}
+                    className="pointer-events-none absolute -right-24 -bottom-24 h-80 w-80 rounded-full bg-emerald-300/20 blur-3xl"
+                />
 
                 <div className="relative mx-auto max-w-6xl">
-                    <header className="mb-12 rounded-3xl border border-black/5 bg-white/60 p-8 text-center shadow-sm backdrop-blur md:p-10">
+                    {/* Animated Header */}
+                    <motion.header
+                        initial={{ opacity: 0, y: 30 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.5, ease: 'easeOut' }}
+                        className="mb-12 rounded-3xl border border-black/5 bg-white/60 p-8 text-center shadow-sm backdrop-blur md:p-10"
+                    >
                         <p className="font-headline text-primary mb-2 text-sm font-bold tracking-[0.2em] uppercase">
                             Hubungi Kami
                         </p>
@@ -51,27 +73,43 @@ export default function Contact() {
                                 0812-2182-7745 (Admin)
                             </p>
                         </div>
-                        <div className="mt-6">
-                            <a
+                        <motion.div
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: 0.3, duration: 0.4 }}
+                            className="mt-6"
+                        >
+                            <motion.a
                                 href={whatsappUrl}
                                 target="_blank"
                                 rel="noreferrer"
+                                whileHover={{ scale: 1.05 }}
+                                whileTap={{ scale: 0.95 }}
                                 className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-5 py-3 text-sm font-extrabold text-white transition hover:bg-emerald-700"
                             >
                                 <MessageCircle className="h-4 w-4" />
                                 Chat WhatsApp Admin
-                            </a>
-                        </div>
-                    </header>
+                            </motion.a>
+                        </motion.div>
+                    </motion.header>
 
+                    {/* Animated Branch Cards */}
                     <div className="grid grid-cols-1 gap-8 md:grid-cols-2">
-                        {branches.map((branch) => (
-                            <article
+                        {branches.map((branch, idx) => (
+                            <motion.article
                                 key={branch.name}
+                                initial={{ opacity: 0, y: 30 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                transition={{ delay: 0.2 + idx * 0.15, duration: 0.5, ease: 'easeOut' }}
                                 className="rounded-3xl border border-black/5 bg-white p-6 shadow-sm"
                             >
-                                <div className="mb-6 flex aspect-[4/3] items-center justify-center rounded-2xl border-2 border-dashed border-surface-container-highest bg-surface-container-low text-on-surface-variant text-lg font-semibold">
-                                    (Foto)
+                                <div className="mb-6 overflow-hidden rounded-2xl border border-black/10 bg-surface-container-low shadow-sm">
+                                    <img
+                                        src={branch.imageUrl}
+                                        alt={branch.imageAlt}
+                                        loading="lazy"
+                                        className="aspect-[4/3] w-full object-cover"
+                                    />
                                 </div>
 
                                 <h2 className="font-headline text-on-surface mb-2 text-2xl font-extrabold">
@@ -81,16 +119,18 @@ export default function Contact() {
                                     {branch.address}
                                 </p>
 
-                                <a
+                                <motion.a
                                     href={branch.mapsUrl}
                                     target="_blank"
                                     rel="noreferrer"
+                                    whileHover={{ scale: 1.03 }}
+                                    whileTap={{ scale: 0.97 }}
                                     className="bg-primary inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold text-white transition hover:brightness-110"
                                 >
                                     <MapPin className="h-4 w-4" />
                                     Buka Maps
-                                </a>
-                            </article>
+                                </motion.a>
+                            </motion.article>
                         ))}
                     </div>
                 </div>

@@ -11,6 +11,7 @@ final readonly class AdminDashboardData
     public function __construct(
         public AdminDashboardStatsData $stats,
         public LengthAwarePaginator $products,
+        public array $categoryComposition,
     ) {}
 
     public function toArray(): array
@@ -18,6 +19,7 @@ final readonly class AdminDashboardData
         return [
             'stats' => $this->stats->toArray(),
             'products' => PaginatedData::fromLengthAwarePaginator($this->products)->toArray(),
+            'categoryComposition' => $this->categoryComposition,
         ];
     }
 }

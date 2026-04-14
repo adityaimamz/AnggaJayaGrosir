@@ -77,14 +77,19 @@ export default function Cart() {
     return (
         <PublicLayout>
             <div className="mx-auto max-w-7xl px-6 pt-28 pb-20 md:px-12 lg:px-24">
-                <header className="mb-12">
+                <motion.header
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.4 }}
+                    className="mb-12"
+                >
                     <h1 className="font-headline text-on-surface mb-2 text-4xl font-extrabold tracking-tight md:text-5xl">
                         Keranjang Belanja
                     </h1>
                     <p className="text-on-surface-variant text-lg font-medium">
                         Anda memiliki {items.length} item grosir siap dipesan.
                     </p>
-                </header>
+                </motion.header>
 
                 <div className="flex flex-col gap-12 lg:flex-row">
                     <div className="flex-grow space-y-8">
@@ -164,7 +169,12 @@ export default function Cart() {
                         </AnimatePresence>
 
                         {items.length === 0 && (
-                            <div className="bg-surface-container-low rounded-3xl py-20 text-center">
+                            <motion.div
+                                initial={{ opacity: 0, scale: 0.9 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                transition={{ duration: 0.4, type: 'spring' }}
+                                className="bg-surface-container-low rounded-3xl py-20 text-center"
+                            >
                                 <p className="text-on-surface-variant mb-6 text-2xl font-bold">
                                     Keranjang Anda kosong
                                 </p>
@@ -174,11 +184,16 @@ export default function Cart() {
                                 >
                                     Mulai Belanja
                                 </Link>
-                            </div>
+                            </motion.div>
                         )}
                     </div>
 
-                    <aside className="lg:w-[400px]">
+                    <motion.aside
+                        initial={{ opacity: 0, x: 30 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: 0.2, duration: 0.5 }}
+                        className="lg:w-[400px]"
+                    >
                         <div className="bg-surface-container-lowest sticky top-28 rounded-3xl border border-black/5 p-8 shadow-[0_-12px_40px_rgba(28,27,27,0.06)]">
                             <h2 className="font-headline text-on-surface mb-8 text-2xl font-black">
                                 Ringkasan Pesanan
@@ -205,11 +220,13 @@ export default function Cart() {
                                 </div>
                             </div>
 
-                            <button
+                            <motion.button
                                 type="button"
                                 onClick={openCheckoutModal}
                                 disabled={items.length === 0}
-                                className="bg-tertiary mb-4 flex w-full flex-col items-center justify-center gap-1 rounded-2xl px-6 py-5 text-white shadow-lg transition-all hover:brightness-110 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:brightness-100"
+                                whileHover={items.length > 0 ? { scale: 1.02 } : {}}
+                                whileTap={items.length > 0 ? { scale: 0.97 } : {}}
+                                className="bg-tertiary mb-4 flex w-full flex-col items-center justify-center gap-1 rounded-2xl px-6 py-5 text-white shadow-lg transition-all hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:brightness-100"
                             >
                                 <div className="flex items-center gap-2">
                                     <MessageCircle className="h-6 w-6 fill-current" />
@@ -220,7 +237,7 @@ export default function Cart() {
                                 <span className="text-xs font-medium opacity-80">
                                     Respon Cepat: Sen-Sab 08:00 - 17:00
                                 </span>
-                            </button>
+                            </motion.button>
 
                             <div className="text-on-surface-variant/40 flex items-center justify-center gap-2">
                                 <ShieldCheck className="h-4 w-4" />
@@ -229,7 +246,7 @@ export default function Cart() {
                                 </p>
                             </div>
                         </div>
-                    </aside>
+                    </motion.aside>
                 </div>
             </div>
 

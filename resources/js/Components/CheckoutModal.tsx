@@ -82,18 +82,18 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
     const buildWhatsappMessage = (code: string) => {
         return [
-            'Terimakasih atas pesanannya',
+            'Terima kasih atas pesanannya.',
             `Kode Pesanan: ${code}`,
             `Nama: ${form.name.trim()}`,
             `Alamat: ${form.address.trim()}`,
             `Ekspedisi: ${form.expedition.trim()}`,
             '',
-            'Selanjutnya akan admin buatkan Nota terlebih dahulu. Mohon anda menunggu',
+            'Selanjutnya admin akan membuat nota terlebih dahulu. Mohon tunggu sebentar.',
             '',
-            'Perhatian!',
-            '* Website tidak menunjukan ketersediaan stok di toko kami',
-            '* Apabila stok produk kosong maka tidak akan masuk kedalam nota',
-            '* Admin akan konfirmasi jika barang yg anda inginkan tersebut sedang kosong',
+            '[PERHATIAN]',
+            '- Website tidak menunjukan ketersediaan stok di toko kami',
+            '- Apabila stok produk kosong maka tidak akan masuk ke dalam nota',
+            '- Admin akan konfirmasi jika barang yang anda inginkan sedang kosong',
         ].join('\n');
     };
 
@@ -152,7 +152,8 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
             setOrderCode(code);
 
             const text = buildWhatsappMessage(code);
-            const whatsappUrl = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(text)}`;
+            const params = new URLSearchParams({ text });
+            const whatsappUrl = `https://wa.me/${whatsappNumber}?${params.toString()}`;
 
             await downloadInvoiceImage(code);
 

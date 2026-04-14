@@ -4,12 +4,8 @@ import { Link } from '@inertiajs/react';
 import {
     Banknote,
     Box,
-    ChevronLeft,
-    ChevronRight,
     Home,
     Layers,
-    Pencil,
-    Trash2,
     TriangleAlert,
 } from 'lucide-react';
 
@@ -24,6 +20,7 @@ interface AdminDashboardStats {
 interface AdminDashboardProps {
     stats: AdminDashboardStats;
     products: LengthAwarePaginated<AdminProductRow>;
+    categoryComposition: { name: string; count: number }[];
 }
 
 const numberFormatter = new Intl.NumberFormat('id-ID');
@@ -32,10 +29,21 @@ const currencyFormatter = {
     format: (value: number) => `Rp ${Number(value).toLocaleString('id-ID')}`
 };
 
-export default function AdminDashboard({
-    stats,
-    products,
-}: AdminDashboardProps) {
+export default function AdminDashboard(props: Readonly<AdminDashboardProps>) {
+    const { stats, products, categoryComposition } = props;
+
+    const lowStockPreview = products.data
+        .filter((product) => product.totalStock < 120)
+        .slice(0, 5);
+
+    const categoryCompositionList = categoryComposition;
+
+    const averageStockPerProduct =
+        stats.totalProducts > 0 ? stats.totalStockUnits / stats.totalProducts : 0;
+
+    const averageStockValuePerProduct =
+        stats.totalProducts > 0 ? stats.stockValue / stats.totalProducts : 0;
+
     return (
         <AdminLayout>
             <header className="flex flex-wrap items-center justify-between gap-4">
@@ -107,146 +115,116 @@ export default function AdminDashboard({
             </section>
 
             <section className="bg-surface-container-lowest rounded-2xl border border-black/5 p-5 md:p-6">
-                <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
                     <div>
                         <h2 className="font-headline text-on-surface text-xl font-black">
-                            Manajemen Produk
+                            Insight Operasional
                         </h2>
                         <p className="text-on-surface-variant text-sm">
-                            Menampilkan {products.from ?? 0}-{products.to ?? 0}{' '}
-                            dari {products.total} produk
+                            Ringkasan stok cepat untuk pengambilan keputusan harian.
                         </p>
                     </div>
-                    <div className="bg-surface-container text-on-surface-variant rounded-xl px-3 py-2 text-sm font-medium">
-                        Total Unit Stok:{' '}
-                        {numberFormatter.format(stats.totalStockUnits)}
-                    </div>
+                    <Link
+                        href="/admin/products"
+                        className="bg-surface-container text-on-surface hover:bg-surface-container-high inline-flex items-center rounded-xl px-3.5 py-2 text-sm font-semibold"
+                    >
+                        Buka Produk Admin
+                    </Link>
                 </div>
 
-                <div className="overflow-x-auto">
-                    <table className="divide-surface-container-highest min-w-full divide-y text-left">
-                        <thead>
-                            <tr className="text-on-surface-variant/70 text-xs tracking-wider uppercase">
-                                <th className="py-3 pr-4">Produk</th>
-                                <th className="py-3 pr-4">Kategori</th>
-                                <th className="py-3 pr-4">Tipe Variasi</th>
-                                <th className="py-3 pr-4">Harga</th>
-                                <th className="py-3 pr-4">Total Stok</th>
-                                <th className="py-3 text-right">Aksi</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-surface-container-highest divide-y">
-                            {products.data.map((product) => (
-                                <tr
-                                    key={product.id}
-                                    className="hover:bg-surface-container-low"
-                                >
-                                    <td className="py-3 pr-4">
-                                        <div className="flex items-center gap-3">
-                                            <div className="bg-surface-container h-10 w-10 overflow-hidden rounded-lg">
-                                                {product.image ? (
-                                                    <img
-                                                        className="h-full w-full object-cover"
-                                                        src={product.image}
-                                                        alt={product.name}
-                                                        referrerPolicy="no-referrer"
-                                                    />
-                                                ) : null}
-                                            </div>
-                                            <div>
-                                                <p className="text-on-surface font-semibold">
-                                                    {product.name}
-                                                </p>
-                                                <p className="text-on-surface-variant text-xs">
-                                                    /{product.slug}
-                                                </p>
-                                            </div>
+                <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                    <article className="bg-surface-container rounded-2xl border border-black/5 p-4">
+                        <div className="mb-3 flex items-center justify-between gap-3">
+                            <h3 className="text-on-surface text-base font-bold">
+                                Watchlist Stok Rendah
+                            </h3>
+                            <span className="bg-primary-fixed text-on-primary-fixed inline-flex rounded-full px-2.5 py-1 text-xs font-bold">
+                                {numberFormatter.format(stats.lowStockProducts)} produk
+                            </span>
+                        </div>
+
+                        {lowStockPreview.length > 0 ? (
+                            <ul className="space-y-2">
+                                {lowStockPreview.map((product) => (
+                                    <li
+                                        key={product.id}
+                                        className="bg-surface-container-low flex items-center justify-between rounded-xl px-3 py-2"
+                                    >
+                                        <div>
+                                            <p className="text-on-surface text-sm font-semibold">
+                                                {product.name}
+                                            </p>
+                                            <p className="text-on-surface-variant text-xs">
+                                                {product.category.name}
+                                            </p>
                                         </div>
-                                    </td>
-                                    <td className="text-on-surface-variant py-3 pr-4 text-sm font-medium">
-                                        {product.category.name}
-                                    </td>
-                                    <td className="text-on-surface-variant py-3 pr-4 text-sm">
-                                        {product.variantTypes?.length > 0
-                                            ? product.variantTypes.join(', ')
-                                            : 'All Size'}
-                                    </td>
-                                    <td className="text-on-surface py-3 pr-4 text-sm font-semibold">
-                                        {product.minPrice === product.maxPrice
-                                            ? currencyFormatter.format(product.minPrice)
-                                            : `${currencyFormatter.format(product.minPrice)} – ${currencyFormatter.format(product.maxPrice)}`}
-                                    </td>
-                                    <td className="py-3 pr-4">
-                                        <span
-                                            className={`inline-flex rounded-full px-2.5 py-1 text-xs font-bold ${
-                                                product.totalStock < 120
-                                                    ? 'bg-primary-fixed text-on-primary-fixed'
-                                                    : 'bg-tertiary/10 text-tertiary'
-                                            }`}
-                                        >
-                                            {numberFormatter.format(
-                                                product.totalStock,
-                                            )}
+                                        <span className="bg-primary-fixed text-on-primary-fixed inline-flex rounded-full px-2 py-1 text-xs font-bold">
+                                            {numberFormatter.format(product.totalStock)}
                                         </span>
-                                    </td>
-                                    <td className="py-3 text-right">
-                                        <div className="inline-flex items-center gap-1">
-                                            <button
-                                                type="button"
-                                                className="text-on-surface-variant hover:bg-surface-container rounded-lg p-2"
-                                            >
-                                                <Pencil className="h-4 w-4" />
-                                            </button>
-                                            <button
-                                                type="button"
-                                                className="text-primary hover:bg-primary-fixed rounded-lg p-2"
-                                            >
-                                                <Trash2 className="h-4 w-4" />
-                                            </button>
-                                        </div>
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
+                                    </li>
+                                ))}
+                            </ul>
+                        ) : (
+                            <p className="text-on-surface-variant rounded-xl bg-emerald-500/10 px-3 py-2 text-sm">
+                                Semua produk pada data saat ini berada di atas batas stok minimum.
+                            </p>
+                        )}
+                    </article>
 
-                <div className="border-surface-container-highest mt-5 flex flex-wrap items-center justify-between gap-3 border-t pt-4">
-                    <p className="text-on-surface-variant text-sm">
-                        Halaman {products.currentPage} dari {products.lastPage}
-                    </p>
-                    <div className="flex items-center gap-2">
-                        <Link
-                            href={
-                                products.currentPage > 1
-                                    ? `/admin/dashboard?page=${products.currentPage - 1}`
-                                    : '/admin/dashboard'
-                            }
-                            className={`inline-flex items-center gap-1 rounded-lg px-3 py-2 text-sm font-semibold ${
-                                products.currentPage > 1
-                                    ? 'bg-surface-container text-on-surface hover:bg-surface-container-high'
-                                    : 'bg-surface-container-low text-on-surface-variant/50 cursor-not-allowed'
-                            }`}
-                            preserveScroll
-                        >
-                            <ChevronLeft className="h-4 w-4" /> Prev
-                        </Link>
-                        <Link
-                            href={
-                                products.currentPage < products.lastPage
-                                    ? `/admin/dashboard?page=${products.currentPage + 1}`
-                                    : `/admin/dashboard?page=${products.currentPage}`
-                            }
-                            className={`inline-flex items-center gap-1 rounded-lg px-3 py-2 text-sm font-semibold ${
-                                products.currentPage < products.lastPage
-                                    ? 'bg-primary text-white hover:brightness-110'
-                                    : 'bg-surface-container-low text-on-surface-variant/50 cursor-not-allowed'
-                            }`}
-                            preserveScroll
-                        >
-                            Next <ChevronRight className="h-4 w-4" />
-                        </Link>
-                    </div>
+                    <article className="bg-surface-container rounded-2xl border border-black/5 p-4">
+                        <h3 className="text-on-surface mb-3 text-base font-bold">
+                            Ringkasan Distribusi
+                        </h3>
+
+                        <div className="mb-4 grid grid-cols-2 gap-2">
+                            <div className="bg-surface-container-low rounded-xl px-3 py-2">
+                                <p className="text-on-surface-variant text-xs">
+                                    Rata-rata unit/produk
+                                </p>
+                                <p className="text-on-surface text-sm font-bold">
+                                    {numberFormatter.format(
+                                        Math.round(averageStockPerProduct),
+                                    )}
+                                </p>
+                            </div>
+                            <div className="bg-surface-container-low rounded-xl px-3 py-2">
+                                <p className="text-on-surface-variant text-xs">
+                                    Rata-rata nilai/produk
+                                </p>
+                                <p className="text-on-surface text-sm font-bold">
+                                    {currencyFormatter.format(
+                                        Math.round(averageStockValuePerProduct),
+                                    )}
+                                </p>
+                            </div>
+                        </div>
+
+                        <h4 className="text-on-surface-variant mb-2 text-xs font-semibold tracking-wider uppercase">
+                            Kategori Dominan (Semua Produk)
+                        </h4>
+
+                        {categoryCompositionList.length > 0 ? (
+                            <ul className="space-y-2">
+                                {categoryCompositionList.map((item) => (
+                                    <li
+                                        key={item.name}
+                                        className="bg-surface-container-low flex items-center justify-between rounded-xl px-3 py-2"
+                                    >
+                                        <span className="text-on-surface text-sm font-medium">
+                                            {item.name}
+                                        </span>
+                                        <span className="text-on-surface-variant text-xs font-bold">
+                                            {numberFormatter.format(item.count)} produk
+                                        </span>
+                                    </li>
+                                ))}
+                            </ul>
+                        ) : (
+                            <p className="text-on-surface-variant text-sm">
+                                Belum ada data kategori untuk diringkas.
+                            </p>
+                        )}
+                    </article>
                 </div>
             </section>
         </AdminLayout>

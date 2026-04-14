@@ -144,23 +144,31 @@ final class ProductManagementController extends Controller
     {
         $cleanExisting = array_values(array_filter($existing, static fn (mixed $item): bool => is_string($item) && $item !== ''));
 
-        $result = [];
+        $requestedRetained = $validated['retained_image_paths'] ?? $cleanExisting;
+        $retainedCandidates = is_array($requestedRetained)
+            ? array_values(array_filter($requestedRetained, static fn (mixed $item): bool => is_string($item) && $item !== ''))
+            : $cleanExisting;
+        $retainedExisting = array_values(array_intersect($cleanExisting, $retainedCandidates));
+
+        $result = $retainedExisting;
+        $remainingSlots = max(0, 5 - count($retainedExisting));
 
         $fileImages = $validated['image_files'] ?? [];
-        if (is_array($fileImages)) {
+        if (is_array($fileImages) && $remainingSlots > 0) {
             foreach ($fileImages as $file) {
+                if ($remainingSlots <= 0) {
+                    break;
+                }
+
                 if ($file instanceof UploadedFile) {
                     $result[] = $this->imageOptimizer->storeOptimized(
                         file: $file,
                         disk: $disk,
                         directory: 'products',
                     );
+                    $remainingSlots--;
                 }
             }
-        }
-
-        if (count($result) === 0) {
-            return array_slice($cleanExisting, 0, 5);
         }
 
         $result = array_values(array_unique(array_slice($result, 0, 5)));
