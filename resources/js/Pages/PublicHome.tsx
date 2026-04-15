@@ -1,4 +1,5 @@
 import PublicLayout from '@/Layouts/PublicLayout';
+import ImageLightbox from '@/Components/ImageLightbox';
 import { getBadgeClassName, resolveProductBadges } from '@/utils/productBadges';
 import {
     CategorySummary,
@@ -52,6 +53,7 @@ export default function Home({
     const [searchInput, setSearchInput] = useState(filters?.search ?? '');
     const [activeSort, setActiveSort] = useState(filters?.sort ?? 'newest');
     const [currentBannerIdx, setCurrentBannerIdx] = useState(0);
+    const [selectedBanner, setSelectedBanner] = useState<Banner | null>(null);
     const [filterView, setFilterView] = useState<'main' | 'kategori' | 'merek'>('main');
     const [catSearch, setCatSearch] = useState('');
     const [brandSearch, setBrandSearch] = useState('');
@@ -173,15 +175,22 @@ export default function Home({
                             <div
                                 key={banner.id}
                                 className={`absolute inset-0 transition-opacity duration-1000 ease-in-out ${
-                                    currentBannerIdx === idx ? 'opacity-100 z-10' : 'opacity-0 z-0'
+                                    currentBannerIdx === idx ? 'opacity-100 z-10 pointer-events-auto' : 'opacity-0 z-0 pointer-events-none'
                                 }`}
                             >
-                                <img
-                                    src={banner.image_url}
-                                    alt={`Banner ${banner.sort_order}`}
-                                    className="h-full w-full object-cover"
-                                />
-                                <div className="absolute inset-0 bg-black/10 mix-blend-multiply" />
+                                <button
+                                    type="button"
+                                    onClick={() => setSelectedBanner(banner)}
+                                    className="h-full w-full cursor-zoom-in"
+                                    aria-label={`Perbesar banner ${banner.sort_order}`}
+                                >
+                                    <img
+                                        src={banner.image_url}
+                                        alt={`Banner ${banner.sort_order}`}
+                                        className="h-full w-full object-cover"
+                                    />
+                                    <div className="absolute inset-0 bg-black/10 mix-blend-multiply" />
+                                </button>
                             </div>
                         ))
                     ) : (
@@ -627,6 +636,13 @@ export default function Home({
                     </motion.div>
                 )}
             </div>
+
+            <ImageLightbox
+                src={selectedBanner?.image_url ?? null}
+                alt={selectedBanner ? `Banner ${selectedBanner.sort_order}` : 'Banner'}
+                isOpen={selectedBanner !== null}
+                onClose={() => setSelectedBanner(null)}
+            />
         </PublicLayout>
     );
 }

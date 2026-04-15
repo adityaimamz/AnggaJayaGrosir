@@ -1,6 +1,7 @@
 import React, { FormEvent, useState } from 'react';
 import { Head, router, useForm, usePage } from '@inertiajs/react';
 import AdminLayout from '@/Layouts/AdminLayout';
+import AppModal from '@/Components/AppModal';
 import { Banner } from '@/types/domain';
 import { CheckCircle2, Edit2, Image as ImageIcon, Plus, Trash2, X } from 'lucide-react';
 import { PageProps } from '@/types';
@@ -16,6 +17,7 @@ export default function Banners({ banners }: BannersProps) {
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [editTarget, setEditTarget] = useState<Banner | null>(null);
+    const [deleteTarget, setDeleteTarget] = useState<Banner | null>(null);
 
     const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
@@ -92,12 +94,19 @@ export default function Banners({ banners }: BannersProps) {
         });
     };
 
-    const deleteBanner = (banner: Banner) => {
-        if (confirm('Yakin ingin menghapus banner ini?')) {
-            router.delete(route('admin.banners.destroy', banner.id), {
-                preserveScroll: true,
-            });
+    const requestDeleteBanner = (banner: Banner) => {
+        setDeleteTarget(banner);
+    };
+
+    const confirmDeleteBanner = () => {
+        if (!deleteTarget) {
+            return;
         }
+
+        router.delete(route('admin.banners.destroy', deleteTarget.id), {
+            preserveScroll: true,
+            onSuccess: () => setDeleteTarget(null),
+        });
     };
 
     const toggleActive = (banner: Banner) => {
@@ -155,7 +164,7 @@ export default function Banners({ banners }: BannersProps) {
                     <div key={banner.id} className="bg-surface-container-lowest overflow-hidden rounded-2xl shadow-sm border border-black/5 relative group">
                         <div className="aspect-[16/6] bg-surface-container relative">
                             <img src={banner.image_url} alt={`Banner ${banner.sort_order}`} className="w-full h-full object-cover" />
-                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                            <div className="absolute inset-0 hidden sm:flex bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity items-center justify-center gap-2">
                                 <button
                                     onClick={() => openEditModal(banner)}
                                     className="bg-white text-black p-2 rounded-full hover:scale-110 transition-transform"
@@ -164,22 +173,47 @@ export default function Banners({ banners }: BannersProps) {
                                     <Edit2 className="h-4 w-4" />
                                 </button>
                                 <button
-                                    onClick={() => deleteBanner(banner)}
-                                    className="bg-error text-white p-2 rounded-full hover:scale-110 transition-transform"
+                                    onClick={() => requestDeleteBanner(banner)}
+                                    className="bg-red-600 text-white border-0 p-2 rounded-full hover:bg-red-700 hover:scale-110 transition-transform"
                                     title="Hapus Banner"
                                 >
                                     <Trash2 className="h-4 w-4" />
                                 </button>
                             </div>
                         </div>
-                        <div className="p-4 flex items-center justify-between">
-                            <div className="text-sm font-bold text-on-surface">Urutan: {banner.sort_order}</div>
-                            <button
-                                onClick={() => toggleActive(banner)}
-                                className={`px-3 py-1 rounded-full text-xs font-bold text-white transition-colors ${banner.is_active ? 'bg-primary text-on-primary' : 'bg-surface-container text-on-surface-variant'}`}
-                            >
-                                {banner.is_active ? 'Aktif' : 'Nonaktif'}
-                            </button>
+                        <div className="p-4 space-y-3">
+                            <div className="flex items-center justify-between">
+                                <div className="text-sm font-bold text-on-surface">Urutan: {banner.sort_order}</div>
+                                <button
+                                    onClick={() => toggleActive(banner)}
+                                    className={`px-3 py-1 rounded-full text-xs font-bold text-white transition-colors ${banner.is_active ? 'bg-primary text-on-primary' : 'bg-surface-container text-on-surface-variant'}`}
+                                >
+                                    {banner.is_active ? 'Aktif' : 'Nonaktif'}
+                                </button>
+                            </div>
+
+                            <div className="flex sm:hidden items-center gap-2">
+                                <button
+                                    onClick={() => openEditModal(banner)}
+                                    className="flex-1 bg-surface-container text-on-surface rounded-xl px-3 py-2 text-xs font-bold transition-colors hover:bg-surface-container-high"
+                                    title="Edit Banner"
+                                >
+                                    <span className="inline-flex items-center justify-center gap-1.5">
+                                        <Edit2 className="h-3.5 w-3.5" />
+                                        Edit
+                                    </span>
+                                </button>
+                                <button
+                                    onClick={() => requestDeleteBanner(banner)}
+                                    className="flex-1 bg-primary text-white border-0 rounded-xl px-3 py-2 text-xs font-bold transition-colors hover:bg-red-700"
+                                    title="Hapus Banner"
+                                >
+                                    <span className="inline-flex items-center justify-center gap-1.5">
+                                        <Trash2 className="h-3.5 w-3.5" />
+                                        Hapus
+                                    </span>
+                                </button>
+                            </div>
                         </div>
                     </div>
                 ))}
@@ -263,6 +297,34 @@ export default function Banners({ banners }: BannersProps) {
                     </div>
                 </div>
             )}
+
+            <AppModal
+                open={deleteTarget !== null}
+                title="Hapus Banner"
+                description={
+                    deleteTarget
+                        ? `Banner urutan ${deleteTarget.sort_order} akan dihapus permanen.`
+                        : undefined
+                }
+                onClose={() => setDeleteTarget(null)}
+            >
+                <div className="mt-4 flex items-center justify-end gap-2">
+                    <button
+                        type="button"
+                        onClick={() => setDeleteTarget(null)}
+                        className="bg-surface-container rounded-xl px-4 py-2 text-sm font-semibold"
+                    >
+                        Batal
+                    </button>
+                    <button
+                        type="button"
+                        onClick={confirmDeleteBanner}
+                        className="bg-primary rounded-xl px-4 py-2 text-sm font-bold text-white hover:bg-red-700"
+                    >
+                        Ya, Hapus
+                    </button>
+                </div>
+            </AppModal>
 
             {/* EDIT MODAL */}
             {isEditModalOpen && editTarget && (
