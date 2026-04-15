@@ -47,7 +47,15 @@ export default function Navbar({
         };
     }, []);
 
-    const isSearchVisible = url === '/' || url.startsWith('/products');
+    const currentPath = url.split('?')[0];
+    const query = url.includes('?') ? new URLSearchParams(url.split('?')[1]) : null;
+    const hasProductFilters = Boolean(
+        query?.has('search') || query?.has('category') || query?.has('brand') || query?.has('sort'),
+    );
+    const isSearchVisible =
+        currentPath === '/' ||
+        currentPath.startsWith('/products') ||
+        hasProductFilters;
 
     return (
         <nav className="glass-header fixed top-0 z-50 flex w-full flex-col shadow-sm">

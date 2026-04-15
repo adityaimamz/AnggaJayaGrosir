@@ -261,7 +261,9 @@ export default function Home({
                             leaveFrom="opacity-100 translate-y-0"
                             leaveTo="opacity-0 translate-y-1"
                         >
-                            <Popover.Panel className="bg-surface absolute left-0 z-50 mt-2 w-[calc(100vw-3rem)] max-w-sm sm:max-w-md md:max-w-lg origin-top-left rounded-2xl shadow-xl ring-1 ring-black/5 focus:outline-none overflow-hidden flex flex-col max-h-[70vh]">
+                            <Popover.Panel
+                                className="bg-surface absolute left-0 top-full z-50 mt-2 w-[min(calc(100vw-3rem),36rem)] max-w-[min(calc(100vw-3rem),36rem)] sm:w-[28rem] sm:max-w-md md:max-w-lg rounded-2xl shadow-xl ring-1 ring-black/5 focus:outline-none overflow-hidden flex flex-col max-h-[70vh] origin-top"
+                            >
                                 {filterView === 'main' && (
                                     <div className="p-5 sm:p-6 overflow-y-auto">
                                         {/* Kategori Section */}
@@ -453,7 +455,7 @@ export default function Home({
                             leaveFrom="transform opacity-100 scale-100"
                             leaveTo="transform opacity-0 scale-95"
                         >
-                            <Popover.Panel className="bg-surface absolute left-0 sm:left-auto sm:right-0 z-50 mt-2 w-44 max-w-[calc(100vw-2rem)] origin-top-left sm:origin-top-right rounded-xl shadow-lg ring-1 ring-black/5 focus:outline-none overflow-y-auto max-h-[300px]">
+                            <Popover.Panel className="bg-surface absolute right-0 left-auto z-50 mt-2 w-40 max-w-[calc(100vw-1rem)] origin-top-right rounded-xl shadow-lg ring-1 ring-black/5 focus:outline-none overflow-y-auto max-h-[300px]">
                                 {({ close }) => (
                                     <div className="py-1 flex flex-col">
                                         {sortOptions.map((option) => (
