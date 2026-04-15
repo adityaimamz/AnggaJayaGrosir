@@ -466,19 +466,20 @@ export default function ProductDetail({ product }: ProductDetailProps) {
                 onClose={() => setShowAddedModal(false)}
             >
                 <div className="mt-4 flex items-center justify-end gap-2">
-                    <button
-                        type="button"
-                        onClick={() => setShowAddedModal(false)}
-                        className="bg-surface-container rounded-xl px-4 py-2 text-sm font-semibold"
-                    >
-                        Lanjut Belanja
-                    </button>
                     <Link
+                        type="button"
                         href="/cart"
-                        className="bg-primary rounded-xl px-4 py-2 text-sm font-bold text-white"
+                        className="bg-surface-container rounded-xl px-4 py-2 text-sm font-semibold"
                     >
                         Lihat Keranjang
                     </Link>
+                    <button
+                        
+                        onClick={() => setShowAddedModal(false)}
+                        className="bg-primary rounded-xl px-4 py-2 text-sm font-bold text-white"
+                    >
+                        Lanjut Belanja
+                    </button>
                 </div>
             </AppModal>
 

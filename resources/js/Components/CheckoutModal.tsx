@@ -3,7 +3,7 @@ import InvoiceTemplate from '@/Components/InvoiceTemplate';
 import axios from 'axios';
 import { toPng } from 'html-to-image';
 import { CheckCircle, Download } from 'lucide-react';
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 
 export interface CheckoutItem {
     id: number;
@@ -43,6 +43,7 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
 }) => {
     const [step, setStep] = useState<1 | 2 | 3>(1);
     const [invoiceDownloaded, setInvoiceDownloaded] = useState(false);
+    const [showDownloadSuccess, setShowDownloadSuccess] = useState(false);
     const [form, setForm] = useState<CheckoutForm>({
         name: '',
         address: '',
@@ -61,6 +62,7 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
     const resetForm = () => {
         setStep(1);
         setInvoiceDownloaded(false);
+        setShowDownloadSuccess(false);
         setForm({
             name: '',
             address: '',
@@ -84,6 +86,18 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
                 [field]: event.target.value,
             }));
         };
+
+    useEffect(() => {
+        if (step !== 3 || !showDownloadSuccess) {
+            return;
+        }
+
+        const timer = globalThis.setTimeout(() => {
+            setShowDownloadSuccess(false);
+        }, 4000);
+
+        return () => globalThis.clearTimeout(timer);
+    }, [step, showDownloadSuccess]);
 
     const buildWhatsappMessage = (code: string) => {
         return [
@@ -159,6 +173,7 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
             
             setInvoiceDownloaded(true);
             setStep(3);
+            setShowDownloadSuccess(true);
         } catch (err) {
             console.error('Failed to export invoice image:', err);
             setError('Gagal mengunduh invoice. Silakan coba lagi.');
@@ -264,7 +279,7 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
                             value={form.expedition}
                             onChange={handleFormChange('expedition')}
                             className="bg-surface-container-lowest text-on-surface border-surface-container-highest focus:border-primary w-full rounded-xl border px-4 py-2.5 outline-none"
-                            placeholder="Contoh: JNE, J&T, SiCepat"
+                            placeholder="Contoh : J&T Cargo, Indah Cargo, Baraka"
                             required
                         />
                     </div>
@@ -333,7 +348,7 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
                         </p>
                     )}
                     
-                    {step === 3 && (
+                    {step === 3 && showDownloadSuccess && (
                         <div className="bg-[#e8f5e9] text-[#2e7d32] border border-[#c8e6c9] rounded-xl px-4 py-3 flex items-start gap-3">
                             <CheckCircle className="h-6 w-6 shrink-0 mt-0.5" />
                             <div>

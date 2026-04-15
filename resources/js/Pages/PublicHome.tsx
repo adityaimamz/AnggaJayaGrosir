@@ -153,12 +153,6 @@ export default function Home({
         { key: 'best_seller', label: 'Produk Best Seller' },
     ];
 
-    const activeSortLabel =
-        activeSort === 'newest'
-            ? 'Filter'
-            : (sortOptions.find((option) => option.key === activeSort)?.label ||
-              'Filter');
-
     const prevHref =
         products.currentPage > 1
             ? `/products?page=${products.currentPage - 1}${filters?.search ? `&search=${encodeURIComponent(filters.search)}` : ''}${filters?.category ? `&category=${encodeURIComponent(filters.category)}` : ''}${filters?.brand ? `&brand=${encodeURIComponent(filters.brand)}` : ''}${filters?.sort && filters.sort !== 'newest' ? `&sort=${encodeURIComponent(filters.sort)}` : ''}`
@@ -249,17 +243,12 @@ export default function Home({
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     transition={{ delay: 0.1, duration: 0.3 }}
-                    className="mb-10 flex flex-wrap items-center justify-between gap-4"
+                    className="mb-10 flex items-center gap-2 justify-between sm:gap-4"
                 >
-                    <Popover className="relative">
-                        <Popover.Button className="border-surface-container-highest text-on-surface-variant hover:bg-surface-container-low flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-medium whitespace-nowrap transition-colors focus:outline-none">
+                    <Popover className="relative shrink-0">
+                        <Popover.Button className="border-surface-container-highest text-on-surface-variant hover:bg-surface-container-low inline-flex items-center gap-2 rounded-full border px-3 py-2 text-xs font-medium whitespace-nowrap transition-colors focus:outline-none sm:px-4 sm:text-sm">
                             <SlidersHorizontal className="h-4 w-4 shrink-0" />
-                            <span>Kategori dan Merek</span>
-                            {(activeCategory !== 'all' || activeBrand !== 'all') && (
-                                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-white">
-                                    {(activeCategory !== 'all' ? 1 : 0) + (activeBrand !== 'all' ? 1 : 0)}
-                                </span>
-                            )}
+                            <span>Kategori & Merek</span>
                             <ChevronDown className="h-4 w-4 shrink-0 ml-1" />
                         </Popover.Button>
 
@@ -448,10 +437,10 @@ export default function Home({
                         </Transition>
                     </Popover>
 
-                    <Popover className="relative">
-                        <Popover.Button className="border-surface-container-highest text-on-surface-variant hover:bg-surface-container-low flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-medium whitespace-nowrap transition-colors focus:outline-none">
+                    <Popover className="relative shrink-0">
+                        <Popover.Button className="border-surface-container-highest text-on-surface-variant hover:bg-surface-container-low inline-flex items-center gap-1.5 rounded-full border px-2.5 py-2 text-xs font-medium whitespace-nowrap transition-colors focus:outline-none sm:px-3 sm:text-sm">
                             <SlidersHorizontal className="h-4 w-4" />
-                            {activeSortLabel}
+                            <span>Filter</span>
                             <ChevronDown className="h-4 w-4" />
                         </Popover.Button>
 
