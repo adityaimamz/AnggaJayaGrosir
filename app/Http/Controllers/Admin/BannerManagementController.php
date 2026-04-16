@@ -9,6 +9,7 @@ use App\Models\Banner;
 use App\Support\ImageOptimizer;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -34,7 +35,6 @@ final class BannerManagementController extends Controller
     {
         $request->validate([
             'image_file' => ['required', 'image', 'max:2048'],
-            'sort_order' => ['nullable', 'integer'],
             'is_active' => ['nullable', 'boolean'],
         ]);
 
@@ -45,9 +45,11 @@ final class BannerManagementController extends Controller
             directory: 'banners',
         );
 
+        $nextSortOrder = ((int) Banner::query()->max('sort_order')) + 1;
+
         Banner::query()->create([
             'image_path' => $imagePath,
-            'sort_order' => $request->input('sort_order', 0) ?? 0,
+            'sort_order' => $nextSortOrder,
             'is_active' => $request->boolean('is_active', true),
         ]);
 
@@ -58,12 +60,17 @@ final class BannerManagementController extends Controller
     {
         $request->validate([
             'image_file' => ['nullable', 'image', 'max:2048'],
-            'sort_order' => ['nullable', 'integer'],
+            'sort_order' => [
+                'required',
+                'integer',
+                'min:1',
+                Rule::unique('banners', 'sort_order')->ignore($banner->id),
+            ],
             'is_active' => ['nullable', 'boolean'],
         ]);
 
         $payload = [
-            'sort_order' => $request->input('sort_order', 0) ?? 0,
+            'sort_order' => (int) $request->input('sort_order'),
             'is_active' => $request->boolean('is_active', true),
         ];
 

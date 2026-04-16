@@ -1563,7 +1563,37 @@ function BrandManagerModal({
     const [loading, setLoading] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
 
-    const csrfToken = (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)?.content ?? '';
+    const getCookieValue = (name: string): string => {
+        const pair = document.cookie
+            .split('; ')
+            .find((item) => item.startsWith(`${name}=`));
+
+        return pair ? decodeURIComponent(pair.split('=').slice(1).join('=')) : '';
+    };
+
+    const getCsrfHeaders = (withJsonContentType = false): Record<string, string> => {
+        const headers: Record<string, string> = {
+            Accept: 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
+        };
+
+        const csrfToken = (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement | null)?.content ?? '';
+        const xsrfToken = getCookieValue('XSRF-TOKEN');
+
+        if (csrfToken) {
+            headers['X-CSRF-TOKEN'] = csrfToken;
+        }
+
+        if (xsrfToken) {
+            headers['X-XSRF-TOKEN'] = xsrfToken;
+        }
+
+        if (withJsonContentType) {
+            headers['Content-Type'] = 'application/json';
+        }
+
+        return headers;
+    };
 
     const resetForm = () => {
         setKode('');
@@ -1573,7 +1603,10 @@ function BrandManagerModal({
     };
 
     const fetchBrands = async () => {
-        const res = await fetch('/admin/brands', { headers: { Accept: 'application/json' } });
+        const res = await fetch('/admin/brands', {
+            credentials: 'same-origin',
+            headers: getCsrfHeaders(),
+        });
         const json = await res.json();
         onBrandsChange(json.data);
     };
@@ -1590,16 +1623,18 @@ function BrandManagerModal({
             const method = editingId ? 'PUT' : 'POST';
             const res = await fetch(url, {
                 method,
-                headers: {
-                    'Content-Type': 'application/json',
-                    Accept: 'application/json',
-                    'X-CSRF-TOKEN': csrfToken,
-                },
+                credentials: 'same-origin',
+                headers: getCsrfHeaders(true),
                 body: JSON.stringify({ kode: kode.trim(), keterangan: keterangan.trim() }),
             });
             if (!res.ok) {
-                const json = await res.json();
-                setError(json.message || 'Gagal menyimpan merek.');
+                const contentType = res.headers.get('content-type') ?? '';
+                if (contentType.includes('application/json')) {
+                    const json = await res.json();
+                    setError(json.message || 'Gagal menyimpan merek.');
+                } else {
+                    setError('Sesi login tidak valid atau token keamanan tidak cocok. Muat ulang halaman.');
+                }
                 return;
             }
             await fetchBrands();
@@ -1623,7 +1658,8 @@ function BrandManagerModal({
         try {
             await fetch(`/admin/brands/${id}`, {
                 method: 'DELETE',
-                headers: { Accept: 'application/json', 'X-CSRF-TOKEN': csrfToken },
+                credentials: 'same-origin',
+                headers: getCsrfHeaders(),
             });
             await fetchBrands();
             if (editingId === id) resetForm();
