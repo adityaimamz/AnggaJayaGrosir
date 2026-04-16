@@ -1,11 +1,19 @@
-import AppModal from '@/Components/AppModal';
+import ConfirmDialog from '@/Components/ui/confirm-dialog';
 import InputError from '@/Components/InputError';
 import AdminLayout from '@/Layouts/AdminLayout';
 import { PageProps } from '@/types';
 import { AdminCategoryRow } from '@/types/domain';
+import {
+    notifyActionError,
+    notifyCreated,
+    notifyDeleted,
+    notifyError,
+    notifyInfo,
+    notifyUpdated,
+} from '@/utils/notify';
 import { useForm, usePage } from '@inertiajs/react';
 import { Pencil, Plus, Shapes, Trash2, X } from 'lucide-react';
-import { FormEvent, ReactNode, useState } from 'react';
+import { FormEvent, ReactNode, useEffect, useState } from 'react';
 
 interface CategoryManagementProps {
     categories: AdminCategoryRow[];
@@ -32,16 +40,23 @@ function slugify(text: string): string {
 
 export default function Categories({ categories }: CategoryManagementProps) {
     const page = usePage<PageProps>();
-    const flashSuccess = page.props.flash?.success;
     const flashError = page.props.flash?.error;
 
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [deleteTarget, setDeleteTarget] = useState<AdminCategoryRow | null>(
         null,
     );
+    const [isDeletingCategory, setIsDeletingCategory] = useState(false);
     const [editingCategory, setEditingCategory] =
         useState<AdminCategoryRow | null>(null);
-    const [infoMessage, setInfoMessage] = useState<string | null>(null);
+
+    useEffect(() => {
+        if (!flashError) {
+            return;
+        }
+
+        notifyError(flashError);
+    }, [flashError]);
 
     const createForm = useForm<CategoryFormData>(emptyForm);
     const editForm = useForm<CategoryFormData>(emptyForm);
@@ -77,7 +92,11 @@ export default function Categories({ categories }: CategoryManagementProps) {
 
         createForm.post('/admin/categories', {
             preserveScroll: true,
-            onSuccess: () => closeCreate(),
+            onSuccess: () => {
+                closeCreate();
+                notifyCreated('Kategori');
+            },
+            onError: () => notifyActionError('menambahkan', 'kategori'),
         });
     };
 
@@ -94,14 +113,18 @@ export default function Categories({ categories }: CategoryManagementProps) {
 
         editForm.post(`/admin/categories/${editingCategory.id}`, {
             preserveScroll: true,
-            onSuccess: () => closeEdit(),
+            onSuccess: () => {
+                closeEdit();
+                notifyUpdated('Kategori');
+            },
+            onError: () => notifyActionError('memperbarui', 'kategori'),
         });
     };
 
     const deleteCategory = (category: AdminCategoryRow) => {
         if (category.productCount > 0) {
-            setInfoMessage(
-                `Kategori \"${category.name}\" masih memiliki ${category.productCount} produk. Pindahkan produk terlebih dahulu sebelum menghapus kategori.`,
+            notifyInfo(
+                `Kategori "${category.name}" masih memiliki ${category.productCount} produk. Pindahkan produk terlebih dahulu sebelum menghapus kategori.`,
             );
 
             return;
@@ -115,9 +138,15 @@ export default function Categories({ categories }: CategoryManagementProps) {
             return;
         }
 
+        setIsDeletingCategory(true);
         editForm.delete(`/admin/categories/${deleteTarget.id}`, {
             preserveScroll: true,
-            onSuccess: () => setDeleteTarget(null),
+            onSuccess: () => {
+                setDeleteTarget(null);
+                notifyDeleted('Kategori');
+            },
+            onError: () => notifyActionError('menghapus', 'kategori'),
+            onFinish: () => setIsDeletingCategory(false),
         });
     };
 
@@ -141,18 +170,6 @@ export default function Categories({ categories }: CategoryManagementProps) {
                     <Plus className="h-4 w-4" /> Tambah Kategori
                 </button>
             </header>
-
-            {flashSuccess ? (
-                <div className="border-tertiary/20 bg-tertiary/10 text-tertiary rounded-xl border px-4 py-3 text-sm font-medium">
-                    {flashSuccess}
-                </div>
-            ) : null}
-
-            {flashError ? (
-                <div className="border-primary/20 bg-primary-fixed text-primary rounded-xl border px-4 py-3 text-sm font-medium">
-                    {flashError}
-                </div>
-            ) : null}
 
             <section className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
                 {categories.map((category) => (
@@ -222,50 +239,21 @@ export default function Categories({ categories }: CategoryManagementProps) {
                 />
             ) : null}
 
-            <AppModal
+            <ConfirmDialog
                 open={deleteTarget !== null}
                 title="Hapus Kategori"
                 description={
                     deleteTarget
-                        ? `Kategori \"${deleteTarget.name}\" akan dihapus permanen.`
+                        ? `Kategori "${deleteTarget.name}" akan dihapus permanen.`
                         : undefined
                 }
-                onClose={() => setDeleteTarget(null)}
-            >
-                <div className="mt-4 flex items-center justify-end gap-2">
-                    <button
-                        type="button"
-                        onClick={() => setDeleteTarget(null)}
-                        className="bg-surface-container rounded-xl px-4 py-2 text-sm font-semibold"
-                    >
-                        Batal
-                    </button>
-                    <button
-                        type="button"
-                        onClick={confirmDeleteCategory}
-                        className="bg-primary rounded-xl px-4 py-2 text-sm font-bold text-white"
-                    >
-                        Ya, Hapus
-                    </button>
-                </div>
-            </AppModal>
-
-            <AppModal
-                open={infoMessage !== null}
-                title="Tidak Bisa Dihapus"
-                description={infoMessage ?? ''}
-                onClose={() => setInfoMessage(null)}
-            >
-                <div className="mt-4 flex justify-end">
-                    <button
-                        type="button"
-                        onClick={() => setInfoMessage(null)}
-                        className="bg-primary rounded-xl px-4 py-2 text-sm font-bold text-white"
-                    >
-                        Mengerti
-                    </button>
-                </div>
-            </AppModal>
+                confirmLabel="Ya, Hapus"
+                cancelLabel="Batal"
+                processing={isDeletingCategory}
+                danger
+                onCancel={() => setDeleteTarget(null)}
+                onConfirm={confirmDeleteCategory}
+            />
         </AdminLayout>
     );
 }

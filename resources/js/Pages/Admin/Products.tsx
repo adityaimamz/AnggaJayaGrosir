@@ -1,4 +1,5 @@
 import AppModal from '@/Components/AppModal';
+import ConfirmDialog from '@/Components/ui/confirm-dialog';
 import InputError from '@/Components/InputError';
 import AdminLayout from '@/Layouts/AdminLayout';
 import { PageProps } from '@/types';
@@ -9,6 +10,14 @@ import {
     LengthAwarePaginated,
     SizeGuide,
 } from '@/types/domain';
+import {
+    notifyActionError,
+    notifyCreated,
+    notifyDeleted,
+    notifyError,
+    notifyProductSearchNotFound,
+    notifyUpdated,
+} from '@/utils/notify';
 import { Link, router, useForm, usePage } from '@inertiajs/react';
 import {
     ChevronLeft,
@@ -194,7 +203,7 @@ export default function Products({
     filters,
 }: ProductManagementProps) {
     const page = usePage<PageProps>();
-    const flashSuccess = page.props.flash?.success;
+    const flashError = page.props.flash?.error;
     const [brands, setBrands] = useState<BrandOption[]>(initialBrands);
 
     const [showCreateModal, setShowCreateModal] = useState(false);
@@ -203,10 +212,40 @@ export default function Products({
     );
     const [editingProduct, setEditingProduct] =
         useState<AdminProductRow | null>(null);
+    const [isDeletingProduct, setIsDeletingProduct] = useState(false);
     const [selectedCategory, setSelectedCategory] = useState(
         filters?.category_id ? String(filters.category_id) : 'all',
     );
     const [searchInput, setSearchInput] = useState(filters?.search ?? '');
+
+    const notifyIfSearchResultEmpty = (
+        responsePage: unknown,
+        requestedSearch: string,
+    ) => {
+        if (requestedSearch.trim() === '') {
+            return;
+        }
+
+        const responseData = (responsePage as {
+            props?: {
+                products?: {
+                    data?: unknown[];
+                };
+            };
+        })?.props?.products?.data;
+
+        if (Array.isArray(responseData) && responseData.length === 0) {
+            notifyProductSearchNotFound();
+        }
+    };
+
+    useEffect(() => {
+        if (!flashError) {
+            return;
+        }
+
+        notifyError(flashError);
+    }, [flashError]);
 
     // Sinkronisasi saat props filters berubah dari luar (misalnya navigasi browser)
     useEffect(() => {
@@ -236,6 +275,9 @@ export default function Products({
             preserveScroll: true,
             replace: true,
             only: ['products', 'filters'],
+            onSuccess: (responsePage) => {
+                notifyIfSearchResultEmpty(responsePage, activeSearch);
+            },
         });
     };
 
@@ -260,6 +302,9 @@ export default function Products({
             preserveScroll: true,
             replace: true,
             only: ['products', 'filters'],
+            onSuccess: (responsePage) => {
+                notifyIfSearchResultEmpty(responsePage, cleanedSearch);
+            },
         });
     };
 
@@ -334,7 +379,11 @@ export default function Products({
         createForm.post('/admin/products', {
             preserveScroll: true,
             forceFormData: true,
-            onSuccess: () => closeCreate(),
+            onSuccess: () => {
+                closeCreate();
+                notifyCreated('Produk');
+            },
+            onError: () => notifyActionError('menambahkan', 'produk'),
         });
     };
 
@@ -355,7 +404,11 @@ export default function Products({
         editForm.post(`/admin/products/${selectedEditId}`, {
             preserveScroll: true,
             forceFormData: true,
-            onSuccess: () => closeEdit(),
+            onSuccess: () => {
+                closeEdit();
+                notifyUpdated('Produk');
+            },
+            onError: () => notifyActionError('memperbarui', 'produk'),
         });
     };
 
@@ -372,9 +425,15 @@ export default function Products({
             ? `/admin/products/${deleteTarget.id}?_filter_category_id=${selectedCategory}${filters?.search ? `&_filter_search=${filters.search}` : ''}`
             : `/admin/products/${deleteTarget.id}`;
 
+        setIsDeletingProduct(true);
         editForm.delete(deleteUrl, {
             preserveScroll: true,
-            onSuccess: () => setDeleteTarget(null),
+            onSuccess: () => {
+                setDeleteTarget(null);
+                notifyDeleted('Produk');
+            },
+            onError: () => notifyActionError('menghapus', 'produk'),
+            onFinish: () => setIsDeletingProduct(false),
         });
     };
 
@@ -397,12 +456,6 @@ export default function Products({
                     <Plus className="h-4 w-4" /> Tambah Produk
                 </button>
             </header>
-
-            {flashSuccess ? (
-                <div className="border-tertiary/20 bg-tertiary/10 text-tertiary rounded-xl border px-4 py-3 text-sm font-medium">
-                    {flashSuccess}
-                </div>
-            ) : null}
 
             <section className="bg-surface-container-lowest rounded-2xl border border-black/5 p-5 md:p-6">
                 <div className="from-surface-container via-surface-container-lowest to-surface-container mb-5 flex flex-wrap items-end justify-between gap-4 rounded-2xl border border-black/5 bg-gradient-to-r p-4">
@@ -640,33 +693,21 @@ export default function Products({
                 />
             ) : null}
 
-            <AppModal
+            <ConfirmDialog
                 open={deleteTarget !== null}
                 title="Hapus Produk"
                 description={
                     deleteTarget
-                        ? `Produk \"${deleteTarget.name}\" akan dihapus permanen.`
+                        ? `Produk "${deleteTarget.name}" akan dihapus permanen.`
                         : undefined
                 }
-                onClose={() => setDeleteTarget(null)}
-            >
-                <div className="mt-4 flex items-center justify-end gap-2">
-                    <button
-                        type="button"
-                        onClick={() => setDeleteTarget(null)}
-                        className="bg-surface-container rounded-xl px-4 py-2 text-sm font-semibold"
-                    >
-                        Batal
-                    </button>
-                    <button
-                        type="button"
-                        onClick={confirmDeleteProduct}
-                        className="bg-primary rounded-xl px-4 py-2 text-sm font-bold text-white"
-                    >
-                        Ya, Hapus
-                    </button>
-                </div>
-            </AppModal>
+                confirmLabel="Ya, Hapus"
+                cancelLabel="Batal"
+                processing={isDeletingProduct}
+                danger
+                onCancel={() => setDeleteTarget(null)}
+                onConfirm={confirmDeleteProduct}
+            />
         </AdminLayout>
     );
 }
@@ -702,6 +743,20 @@ function ProductFormModal({
     onClose,
 }: ProductFormModalProps) {
     const [showBrandManager, setShowBrandManager] = useState(false);
+
+    const requiredFieldErrors = [
+        { label: 'Nama', invalid: Boolean(errors.name) },
+        { label: 'Slug', invalid: Boolean(errors.slug) },
+        { label: 'Kategori', invalid: Boolean(errors.category_id) },
+        {
+            label: 'Variasi Produk',
+            invalid:
+                Boolean(errors.variants) ||
+                Object.keys(errors).some(
+                    (key) => key.startsWith('variants.') || key.startsWith('variant_types.'),
+                ),
+        },
+    ].filter((item) => item.invalid);
 
     const [inputModal, setInputModal] = useState<{
         open: boolean;
@@ -897,28 +952,43 @@ function ProductFormModal({
                     </button>
                 </div>
 
+                <p className="text-on-surface-variant mb-3 text-xs font-semibold">
+                    <span className="text-red-600">*</span> Wajib diisi
+                </p>
+
+                {requiredFieldErrors.length > 0 ? (
+                    <div className="mb-4 rounded-xl border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700">
+                        Field wajib belum lengkap: {requiredFieldErrors.map((item) => item.label).join(', ')}.
+                    </div>
+                ) : null}
+
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                    <Field label="Nama" error={errors.name}>
+                    <Field label="Nama" error={errors.name} required>
                         <input
                             value={data.name}
                             onChange={(event) => {
                                 const name = event.target.value;
+                                const currentAutoSlug = slugify(data.name);
                                 onChange('name', name);
-                                if (!data.slug.trim()) {
+
+                                // Keep slug synced while it is still in auto-generated mode.
+                                if (!data.slug.trim() || data.slug === currentAutoSlug) {
                                     onChange('slug', slugify(name));
                                 }
                             }}
                             className="bg-surface-container focus:border-primary w-full rounded-xl border border-transparent px-3 py-2.5 text-sm focus:outline-none"
+                            required
                         />
                     </Field>
 
-                    <Field label="Slug" error={errors.slug}>
+                    <Field label="Slug" error={errors.slug} required>
                         <input
                             value={data.slug}
                             onChange={(event) =>
                                 onChange('slug', event.target.value)
                             }
                             className="bg-surface-container focus:border-primary w-full rounded-xl border border-transparent px-3 py-2.5 text-sm focus:outline-none"
+                            required
                         />
                         <button
                             type="button"
@@ -929,13 +999,14 @@ function ProductFormModal({
                         </button>
                     </Field>
 
-                    <Field label="Kategori" error={errors.category_id}>
+                    <Field label="Kategori" error={errors.category_id} required>
                         <select
                             value={data.category_id}
                             onChange={(event) =>
                                 onChange('category_id', event.target.value)
                             }
                             className="bg-surface-container focus:border-primary w-full rounded-xl border border-transparent px-3 py-2.5 text-sm focus:outline-none"
+                            required
                         >
                             <option value="">Pilih kategori</option>
                             {categories.map((category) => (
@@ -1073,7 +1144,9 @@ function ProductFormModal({
                     {/* Variant Builder UI */}
                     <div className="md:col-span-2 rounded-xl border border-surface-container-highest p-4 bg-surface-container-lowest">
                         <div className="flex items-center justify-between mb-4">
-                            <h3 className="font-headline text-lg font-bold">Variasi Produk</h3>
+                            <h3 className="font-headline text-lg font-bold">
+                                Variasi Produk <span className="text-red-600">*</span>
+                            </h3>
                             <button
                                 type="button"
                                 onClick={handleAddVariantType}
@@ -1139,8 +1212,8 @@ function ProductFormModal({
                                         <thead className="bg-surface-container-low">
                                             <tr>
                                                 <th className="px-4 py-2 font-semibold w-1/3">Varian ({data.variant_types.join(' / ')})</th>
-                                                <th className="px-4 py-2 font-semibold">Harga</th>
-                                                <th className="px-4 py-2 font-semibold">Stok (Satuan)</th>
+                                                <th className="px-4 py-2 font-semibold">Harga <span className="text-red-600">*</span></th>
+                                                <th className="px-4 py-2 font-semibold">Stok (Satuan) <span className="text-red-600">*</span></th>
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-surface-container-highest bg-surface-container-lowest">
@@ -1188,6 +1261,10 @@ function ProductFormModal({
                                 ))}
                             </div>
                         )}
+
+                        {errors.variants && data.variants.length === 0 ? (
+                            <InputError className="mt-2" message={errors.variants} />
+                        ) : null}
                     </div>
 
                     <div className="md:col-span-2 rounded-xl border border-surface-container-highest p-4 bg-surface-container-lowest">
@@ -1486,16 +1563,18 @@ function ProductFormModal({
 function Field({
     label,
     error,
+    required = false,
     children,
 }: {
     label: string;
     error?: string;
+    required?: boolean;
     children: ReactNode;
 }) {
     return (
         <div>
             <label className="text-on-surface mb-1.5 block text-sm font-semibold">
-                {label}
+                {label}{required ? <span className="text-red-600"> *</span> : null}
             </label>
             {children}
             <InputError className="mt-1" message={error} />
@@ -1595,6 +1674,21 @@ function BrandManagerModal({
         return headers;
     };
 
+    const readErrorMessage = async (res: Response, fallback: string): Promise<string> => {
+        const contentType = res.headers.get('content-type') ?? '';
+
+        if (!contentType.includes('application/json')) {
+            return fallback;
+        }
+
+        try {
+            const json = (await res.json()) as { message?: string };
+            return json.message || fallback;
+        } catch {
+            return fallback;
+        }
+    };
+
     const resetForm = () => {
         setKode('');
         setKeterangan('');
@@ -1619,6 +1713,7 @@ function BrandManagerModal({
         setLoading(true);
         setError('');
         try {
+            const isEditing = editingId !== null;
             const url = editingId ? `/admin/brands/${editingId}` : '/admin/brands';
             const method = editingId ? 'PUT' : 'POST';
             const res = await fetch(url, {
@@ -1631,16 +1726,26 @@ function BrandManagerModal({
                 const contentType = res.headers.get('content-type') ?? '';
                 if (contentType.includes('application/json')) {
                     const json = await res.json();
-                    setError(json.message || 'Gagal menyimpan merek.');
+                    const message = json.message || 'Gagal menyimpan merek.';
+                    setError(message);
+                    notifyError(message);
                 } else {
-                    setError('Sesi login tidak valid atau token keamanan tidak cocok. Muat ulang halaman.');
+                    const message = 'Sesi login tidak valid atau token keamanan tidak cocok. Muat ulang halaman.';
+                    setError(message);
+                    notifyError(message);
                 }
                 return;
             }
             await fetchBrands();
             resetForm();
+            if (isEditing) {
+                notifyUpdated('Merek');
+            } else {
+                notifyCreated('Merek');
+            }
         } catch {
             setError('Terjadi kesalahan jaringan.');
+            notifyError('Terjadi kesalahan jaringan.');
         } finally {
             setLoading(false);
         }
@@ -1655,16 +1760,32 @@ function BrandManagerModal({
 
     const handleDelete = async (id: number) => {
         setLoading(true);
+        setError('');
         try {
-            await fetch(`/admin/brands/${id}`, {
+            const res = await fetch(`/admin/brands/${id}`, {
                 method: 'DELETE',
                 credentials: 'same-origin',
                 headers: getCsrfHeaders(),
             });
+
+            if (!res.ok) {
+                const fallbackMessage =
+                    res.status === 419
+                        ? 'Sesi login tidak valid atau token keamanan tidak cocok. Muat ulang halaman.'
+                        : 'Gagal menghapus merek.';
+                const message = await readErrorMessage(res, fallbackMessage);
+                setError(message);
+                notifyError(message);
+                return;
+            }
+
             await fetchBrands();
             if (editingId === id) resetForm();
+            notifyDeleted('Merek');
         } catch {
-            setError('Gagal menghapus merek.');
+            const message = 'Gagal menghapus merek.';
+            setError(message);
+            notifyError(message);
         } finally {
             setLoading(false);
         }

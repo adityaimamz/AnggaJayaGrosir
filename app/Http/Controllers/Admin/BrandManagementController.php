@@ -6,8 +6,12 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Brand;
+use Illuminate\Database\QueryException;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Throwable;
 
 final class BrandManagementController extends Controller
 {
@@ -52,8 +56,47 @@ final class BrandManagementController extends Controller
 
     public function destroy(Brand $brand): JsonResponse
     {
-        $brand->delete();
+        $statusCode = 200;
+        $payload = ['message' => 'Merek berhasil dihapus.'];
 
-        return response()->json(['message' => 'Merek berhasil dihapus.']);
+        try {
+            DB::transaction(function () use ($brand): void {
+                // Keep delete resilient even when production FK action is not nullOnDelete.
+                $brand->products()->update(['brand_id' => null]);
+                $brand->delete();
+            });
+        } catch (QueryException $exception) {
+            $errorCode = (int) ($exception->errorInfo[1] ?? 0);
+
+            if (in_array($errorCode, [1451, 1452], true)) {
+                $statusCode = 409;
+                $payload = [
+                    'message' => 'Merek tidak bisa dihapus karena masih dipakai oleh data lain.',
+                ];
+            } else {
+                Log::error('Brand delete query failed.', [
+                    'brand_id' => $brand->id,
+                    'error' => $exception->getMessage(),
+                    'sql_error_code' => $errorCode,
+                ]);
+
+                $statusCode = 500;
+                $payload = [
+                    'message' => 'Gagal menghapus merek karena masalah database. Coba lagi beberapa saat.',
+                ];
+            }
+        } catch (Throwable $exception) {
+            Log::error('Brand delete failed.', [
+                'brand_id' => $brand->id,
+                'error' => $exception->getMessage(),
+            ]);
+
+            $statusCode = 500;
+            $payload = [
+                'message' => 'Terjadi kesalahan saat menghapus merek.',
+            ];
+        }
+
+        return response()->json($payload, $statusCode);
     }
 }

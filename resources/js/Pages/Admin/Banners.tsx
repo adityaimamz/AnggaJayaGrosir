@@ -1,10 +1,18 @@
 import React, { FormEvent, useState } from 'react';
 import { Head, router, useForm, usePage } from '@inertiajs/react';
 import AdminLayout from '@/Layouts/AdminLayout';
-import AppModal from '@/Components/AppModal';
+import ConfirmDialog from '@/Components/ui/confirm-dialog';
 import { Banner } from '@/types/domain';
-import { CheckCircle2, Edit2, Image as ImageIcon, Plus, Trash2, X } from 'lucide-react';
+import { Edit2, Image as ImageIcon, Plus, Trash2, X } from 'lucide-react';
 import { PageProps } from '@/types';
+import {
+    notifyActionError,
+    notifyCreated,
+    notifyDeleted,
+    notifyError,
+    notifyStatusChanged,
+    notifyUpdated,
+} from '@/utils/notify';
 
 interface BannersProps extends PageProps {
     banners: Banner[];
@@ -12,14 +20,31 @@ interface BannersProps extends PageProps {
 
 export default function Banners({ banners }: BannersProps) {
     const { flash } = usePage<PageProps>().props;
-    const flashSuccess = flash?.success;
+    const flashError = flash?.error;
+    const nextSortOrder = React.useMemo(
+        () =>
+            banners.reduce(
+                (maxOrder, banner) => Math.max(maxOrder, banner.sort_order),
+                0,
+            ) + 1,
+        [banners],
+    );
 
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [editTarget, setEditTarget] = useState<Banner | null>(null);
     const [deleteTarget, setDeleteTarget] = useState<Banner | null>(null);
+    const [isDeletingBanner, setIsDeletingBanner] = useState(false);
 
     const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+
+    React.useEffect(() => {
+        if (!flashError) {
+            return;
+        }
+
+        notifyError(flashError);
+    }, [flashError]);
 
     // Form states
     const {
@@ -34,6 +59,16 @@ export default function Banners({ banners }: BannersProps) {
         sort_order: 0,
         is_active: true,
     });
+
+    const openCreateModal = () => {
+        setCreateData({
+            image_file: null,
+            sort_order: nextSortOrder,
+            is_active: true,
+        });
+        setPreviewUrl(null);
+        setIsCreateModalOpen(true);
+    };
 
     const {
         data: editData,
@@ -79,7 +114,11 @@ export default function Banners({ banners }: BannersProps) {
         postCreate(route('admin.banners.store'), {
             forceFormData: true,
             preserveScroll: true,
-            onSuccess: () => closeCreateModal(),
+            onSuccess: () => {
+                closeCreateModal();
+                notifyCreated('Banner');
+            },
+            onError: () => notifyActionError('menambahkan', 'banner'),
         });
     };
 
@@ -90,7 +129,11 @@ export default function Banners({ banners }: BannersProps) {
         postEdit(route('admin.banners.update', editTarget.id), {
             forceFormData: true,
             preserveScroll: true,
-            onSuccess: () => closeEditModal(),
+            onSuccess: () => {
+                closeEditModal();
+                notifyUpdated('Banner');
+            },
+            onError: () => notifyActionError('memperbarui', 'banner'),
         });
     };
 
@@ -103,9 +146,15 @@ export default function Banners({ banners }: BannersProps) {
             return;
         }
 
+        setIsDeletingBanner(true);
         router.delete(route('admin.banners.destroy', deleteTarget.id), {
             preserveScroll: true,
-            onSuccess: () => setDeleteTarget(null),
+            onSuccess: () => {
+                setDeleteTarget(null);
+                notifyDeleted('Banner');
+            },
+            onError: () => notifyActionError('menghapus', 'banner'),
+            onFinish: () => setIsDeletingBanner(false),
         });
     };
 
@@ -116,6 +165,11 @@ export default function Banners({ banners }: BannersProps) {
             is_active: !banner.is_active,
         }, {
             preserveScroll: true,
+            onSuccess: () => {
+                const willBeActive = banner.is_active === false;
+                notifyStatusChanged('Banner', willBeActive);
+            },
+            onError: () => notifyActionError('mengubah status', 'banner'),
         });
     };
 
@@ -145,19 +199,12 @@ export default function Banners({ banners }: BannersProps) {
                     </p>
                 </div>
                 <button
-                    onClick={() => setIsCreateModalOpen(true)}
+                    onClick={openCreateModal}
                     className="bg-primary text-on-primary flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-white text-sm font-bold shadow-md transition-all hover:brightness-110"
                 >
                     <Plus className="h-4 w-4" /> Tambah Banner
                 </button>
             </div>
-
-            {flashSuccess && (
-                <div className="bg-primary-container text-on-primary-container mb-6 flex items-center gap-2 rounded-xl p-4 text-sm font-semibold">
-                    <CheckCircle2 className="h-5 w-5" />
-                    {flashSuccess}
-                </div>
-            )}
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {banners.map((banner) => (
@@ -252,7 +299,7 @@ export default function Banners({ banners }: BannersProps) {
                                     type="file"
                                     accept="image/*"
                                     onChange={(e) => handleImageChange(e, false)}
-                                    className="bg-surface-container w-full rounded-xl px-4 py-3 text-sm focus:outline-none file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary file:text-on-primary hover:file:bg-primary/90"
+                                    className="bg-surface-container w-full rounded-xl px-4 py-3 text-sm focus:outline-none file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary file:text-white hover:file:bg-primary/90"
                                     required
                                 />
                                 {createErrors.image_file && <span className="text-error mt-1 text-xs">{createErrors.image_file}</span>}
@@ -265,11 +312,12 @@ export default function Banners({ banners }: BannersProps) {
                                     <input
                                         type="number"
                                         value={createData.sort_order}
-                                        onChange={(e) => setCreateData('sort_order', Number(e.target.value))}
+                                        readOnly
                                         className="bg-surface-container focus:border-primary w-full rounded-xl border border-transparent px-4 py-2.5 text-sm transition-all focus:outline-none"
-                                        placeholder="0"
+                                        placeholder="Auto"
                                     />
                                     {createErrors.sort_order && <span className="text-error mt-1 text-xs">{createErrors.sort_order}</span>}
+                                    <p className="text-xs text-on-surface-variant mt-2">Urutan otomatis mengikuti urutan terakhir.</p>
                                 </div>
                                 <div className="flex flex-col justify-center">
                                     <label className="text-on-surface mb-2 block text-sm font-semibold">Status Muncul</label>
@@ -289,7 +337,7 @@ export default function Banners({ banners }: BannersProps) {
                                 <button type="button" onClick={closeCreateModal} className="text-on-surface-variant hover:bg-surface-container rounded-xl px-4 py-2 text-sm font-bold transition-colors">
                                     Batal
                                 </button>
-                                <button type="submit" disabled={createProcessing} className="bg-primary text-on-primary rounded-xl px-6 py-2 outline-none text-sm font-bold shadow-md transition-all hover:brightness-110 disabled:opacity-50">
+                                <button type="submit" disabled={createProcessing} className="bg-primary text-white rounded-xl px-6 py-2 outline-none text-sm font-bold shadow-md transition-all hover:brightness-110 disabled:opacity-50">
                                     {createProcessing ? 'Menyimpan...' : 'Simpan'}
                                 </button>
                             </div>
@@ -298,7 +346,7 @@ export default function Banners({ banners }: BannersProps) {
                 </div>
             )}
 
-            <AppModal
+            <ConfirmDialog
                 open={deleteTarget !== null}
                 title="Hapus Banner"
                 description={
@@ -306,25 +354,13 @@ export default function Banners({ banners }: BannersProps) {
                         ? `Banner urutan ${deleteTarget.sort_order} akan dihapus permanen.`
                         : undefined
                 }
-                onClose={() => setDeleteTarget(null)}
-            >
-                <div className="mt-4 flex items-center justify-end gap-2">
-                    <button
-                        type="button"
-                        onClick={() => setDeleteTarget(null)}
-                        className="bg-surface-container rounded-xl px-4 py-2 text-sm font-semibold"
-                    >
-                        Batal
-                    </button>
-                    <button
-                        type="button"
-                        onClick={confirmDeleteBanner}
-                        className="bg-primary rounded-xl px-4 py-2 text-sm font-bold text-white hover:bg-red-700"
-                    >
-                        Ya, Hapus
-                    </button>
-                </div>
-            </AppModal>
+                confirmLabel="Ya, Hapus"
+                cancelLabel="Batal"
+                processing={isDeletingBanner}
+                danger
+                onCancel={() => setDeleteTarget(null)}
+                onConfirm={confirmDeleteBanner}
+            />
 
             {/* EDIT MODAL */}
             {isEditModalOpen && editTarget && (
@@ -351,7 +387,7 @@ export default function Banners({ banners }: BannersProps) {
                                     type="file"
                                     accept="image/*"
                                     onChange={(e) => handleImageChange(e, true)}
-                                    className="bg-surface-container w-full rounded-xl px-4 py-3 text-sm focus:outline-none file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary file:text-on-primary hover:file:bg-primary/90"
+                                    className="bg-surface-container w-full rounded-xl px-4 py-3 text-sm focus:outline-none file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary file:text-white hover:file:bg-primary/90"
                                 />
                                 {editErrors.image_file && <span className="text-error mt-1 text-xs">{editErrors.image_file}</span>}
                                 <p className="text-xs text-on-surface-variant mt-2">Biarkan kosong jika tidak ingin mengganti gambar.</p>
@@ -386,7 +422,7 @@ export default function Banners({ banners }: BannersProps) {
                                 <button type="button" onClick={closeEditModal} className="text-on-surface-variant hover:bg-surface-container rounded-xl px-4 py-2 text-sm font-bold transition-colors">
                                     Batal
                                 </button>
-                                <button type="submit" disabled={editProcessing} className="bg-primary text-on-primary rounded-xl px-6 py-2 outline-none text-sm font-bold shadow-md transition-all hover:brightness-110 disabled:opacity-50">
+                                <button type="submit" disabled={editProcessing} className="bg-primary text-white rounded-xl px-6 py-2 outline-none text-sm font-bold shadow-md transition-all hover:brightness-110 disabled:opacity-50">
                                     {editProcessing ? 'Menyimpan...' : 'Simpan Perubahan'}
                                 </button>
                             </div>

@@ -1,6 +1,7 @@
 import PublicLayout from '@/Layouts/PublicLayout';
 import ImageLightbox from '@/Components/ImageLightbox';
 import { getBadgeClassName, resolveProductBadges } from '@/utils/productBadges';
+import { notifyProductSearchNotFound } from '@/utils/notify';
 import {
     CategorySummary,
     LengthAwarePaginated,
@@ -59,6 +60,27 @@ export default function Home({
     const [brandSearch, setBrandSearch] = useState('');
     const previousPageRef = useRef(products.currentPage);
 
+    const notifyIfSearchResultEmpty = (
+        responsePage: unknown,
+        requestedSearch: string,
+    ) => {
+        if (requestedSearch.trim() === '') {
+            return;
+        }
+
+        const responseData = (responsePage as {
+            props?: {
+                products?: {
+                    data?: unknown[];
+                };
+            };
+        })?.props?.products?.data;
+
+        if (Array.isArray(responseData) && responseData.length === 0) {
+            notifyProductSearchNotFound();
+        }
+    };
+
 
 
     useEffect(() => {
@@ -113,6 +135,9 @@ export default function Home({
                     preserveScroll: true,
                     replace: true,
                     only: ['products', 'filters'],
+                    onSuccess: (responsePage) => {
+                        notifyIfSearchResultEmpty(responsePage, nextSearch);
+                    },
                 },
             );
         }, 350);
