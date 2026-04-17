@@ -1650,28 +1650,43 @@ function BrandManagerModal({
         return pair ? decodeURIComponent(pair.split('=').slice(1).join('=')) : '';
     };
 
-    const getCsrfHeaders = (withJsonContentType = false): Record<string, string> => {
+    const getCsrfHeaders = (): Record<string, string> => {
         const headers: Record<string, string> = {
             Accept: 'application/json',
             'X-Requested-With': 'XMLHttpRequest',
         };
 
         const csrfToken = (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement | null)?.content ?? '';
-        const xsrfToken = getCookieValue('XSRF-TOKEN');
 
         if (csrfToken) {
             headers['X-CSRF-TOKEN'] = csrfToken;
         }
 
-        if (xsrfToken) {
-            headers['X-XSRF-TOKEN'] = xsrfToken;
-        }
-
-        if (withJsonContentType) {
-            headers['Content-Type'] = 'application/json';
-        }
-
         return headers;
+    };
+
+    const getCsrfToken = (): string => {
+        const tokenFromMeta = (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement | null)?.content ?? '';
+        if (tokenFromMeta) {
+            return tokenFromMeta;
+        }
+
+        return getCookieValue('XSRF-TOKEN');
+    };
+
+    const buildBrandFormData = (payload: Record<string, string>): FormData => {
+        const formData = new FormData();
+        const csrfToken = getCsrfToken();
+
+        if (csrfToken) {
+            formData.append('_token', csrfToken);
+        }
+
+        Object.entries(payload).forEach(([key, value]) => {
+            formData.append(key, value);
+        });
+
+        return formData;
     };
 
     const readErrorMessage = async (res: Response, fallback: string): Promise<string> => {
@@ -1715,12 +1730,21 @@ function BrandManagerModal({
         try {
             const isEditing = editingId !== null;
             const url = editingId ? `/admin/brands/${editingId}` : '/admin/brands';
-            const method = editingId ? 'PUT' : 'POST';
+
+            const payload: Record<string, string> = {
+                kode: kode.trim(),
+                keterangan: keterangan.trim(),
+            };
+
+            if (isEditing) {
+                payload._method = 'PUT';
+            }
+
             const res = await fetch(url, {
-                method,
+                method: 'POST',
                 credentials: 'same-origin',
-                headers: getCsrfHeaders(true),
-                body: JSON.stringify({ kode: kode.trim(), keterangan: keterangan.trim() }),
+                headers: getCsrfHeaders(),
+                body: buildBrandFormData(payload),
             });
             if (!res.ok) {
                 const contentType = res.headers.get('content-type') ?? '';
@@ -1763,9 +1787,10 @@ function BrandManagerModal({
         setError('');
         try {
             const res = await fetch(`/admin/brands/${id}`, {
-                method: 'DELETE',
+                method: 'POST',
                 credentials: 'same-origin',
                 headers: getCsrfHeaders(),
+                body: buildBrandFormData({ _method: 'DELETE' }),
             });
 
             if (!res.ok) {
