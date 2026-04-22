@@ -165,7 +165,7 @@ export default function ProductDetail({ product }: ProductDetailProps) {
                     </Link>
                     <ChevronRight className="mx-2 h-4 w-4" />
                     <Link
-                        href="/products"
+                        href={`/products?category=${product.category.slug}`}
                         className="hover:text-primary transition-colors"
                     >
                         {product.category.name}

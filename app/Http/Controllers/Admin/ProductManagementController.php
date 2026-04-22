@@ -206,9 +206,14 @@ final class ProductManagementController extends Controller
             $params['search'] = $search;
         }
 
+        $page = (int) $request->input('_filter_page', $request->input('page', 1));
+        if ($page > 1) {
+            $params['page'] = $page;
+        }
+
         $base = route('admin.products.index');
 
-        return count($params) > 0
+        return !empty($params)
             ? $base . '?' . http_build_query($params)
             : $base;
     }

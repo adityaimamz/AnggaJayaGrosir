@@ -20,8 +20,6 @@ import {
 } from '@/utils/notify';
 import { Link, router, useForm, usePage } from '@inertiajs/react';
 import {
-    ChevronLeft,
-    ChevronRight,
     Filter,
     Pencil,
     Plus,
@@ -70,6 +68,13 @@ const numberFormatter = new Intl.NumberFormat('id-ID');
 const currencyFormatter = {
     format: (value: number) => `Rp ${Number(value).toLocaleString('id-ID')}`
 };
+
+function normalizePaginationLabel(label: string): string {
+    return label
+        .replaceAll('&laquo;', '«')
+        .replaceAll('&raquo;', '»')
+        .replaceAll('&amp;', '&');
+}
 
 const emptyForm: ProductFormData = {
     category_id: '',
@@ -324,22 +329,6 @@ export default function Products({
         });
     };
 
-    const buildPageUrl = (page: number): string => {
-        const params = new URLSearchParams();
-        if (page > 1) {
-            params.set('page', String(page));
-        }
-        if (filters?.category_id) {
-            params.set('category_id', String(filters.category_id));
-        }
-        if (filters?.search) {
-            params.set('search', filters.search);
-        }
-
-        const query = params.toString();
-        return query ? `/admin/products?${query}` : '/admin/products';
-    };
-
     const selectedEditId = useMemo(
         () => editingProduct?.id ?? null,
         [editingProduct],
@@ -375,6 +364,7 @@ export default function Products({
             ...toPayload(data),
             _filter_category_id: selectedCategory !== 'all' ? selectedCategory : '',
             _filter_search: filters?.search ?? '',
+            _filter_page: String(products.currentPage),
         }));
         createForm.post('/admin/products', {
             preserveScroll: true,
@@ -398,6 +388,7 @@ export default function Products({
             _method: 'PUT',
             _filter_category_id: selectedCategory !== 'all' ? selectedCategory : '',
             _filter_search: filters?.search ?? '',
+            _filter_page: String(products.currentPage),
         }));
 
         // Use POST with _method spoofing because PHP doesn't support PUT with multipart/form-data
@@ -421,8 +412,23 @@ export default function Products({
             return;
         }
 
-        const deleteUrl = selectedCategory !== 'all'
-            ? `/admin/products/${deleteTarget.id}?_filter_category_id=${selectedCategory}${filters?.search ? `&_filter_search=${filters.search}` : ''}`
+        const deleteParams = new URLSearchParams();
+
+        if (selectedCategory !== 'all') {
+            deleteParams.set('_filter_category_id', selectedCategory);
+        }
+
+        if (filters?.search) {
+            deleteParams.set('_filter_search', filters.search);
+        }
+
+        if (products.currentPage > 1) {
+            deleteParams.set('_filter_page', String(products.currentPage));
+        }
+
+        const deleteQuery = deleteParams.toString();
+        const deleteUrl = deleteQuery
+            ? `/admin/products/${deleteTarget.id}?${deleteQuery}`
             : `/admin/products/${deleteTarget.id}`;
 
         setIsDeletingProduct(true);
@@ -626,37 +632,37 @@ export default function Products({
                     <p className="text-on-surface-variant text-sm">
                         Halaman {products.currentPage} dari {products.lastPage}
                     </p>
-                    <div className="flex items-center gap-2">
-                        <Link
-                            href={
-                                products.currentPage > 1
-                                    ? buildPageUrl(products.currentPage - 1)
-                                    : buildPageUrl(products.currentPage)
+                    <div className="flex flex-wrap items-center gap-2">
+                        {products.links.map((link, index) => {
+                            const normalizedLabel = normalizePaginationLabel(link.label);
+                            const key = `${normalizedLabel}-${index}`;
+
+                            if (link.url === null) {
+                                return (
+                                    <span
+                                        key={key}
+                                        className="bg-surface-container-low text-on-surface-variant/50 inline-flex min-w-10 items-center justify-center rounded-lg px-3 py-2 text-sm font-semibold"
+                                    >
+                                        {normalizedLabel}
+                                    </span>
+                                );
                             }
-                            className={`inline-flex items-center gap-1 rounded-lg px-3 py-2 text-sm font-semibold ${
-                                products.currentPage > 1
-                                    ? 'bg-surface-container text-on-surface hover:bg-surface-container-high'
-                                    : 'bg-surface-container-low text-on-surface-variant/50 cursor-not-allowed'
-                            }`}
-                            preserveScroll
-                        >
-                            <ChevronLeft className="h-4 w-4" /> Prev
-                        </Link>
-                        <Link
-                            href={
-                                products.currentPage < products.lastPage
-                                    ? buildPageUrl(products.currentPage + 1)
-                                    : buildPageUrl(products.currentPage)
-                            }
-                            className={`inline-flex items-center gap-1 rounded-lg px-3 py-2 text-sm font-semibold ${
-                                products.currentPage < products.lastPage
-                                    ? 'bg-primary text-white hover:brightness-110'
-                                    : 'bg-surface-container-low text-on-surface-variant/50 cursor-not-allowed'
-                            }`}
-                            preserveScroll
-                        >
-                            Next <ChevronRight className="h-4 w-4" />
-                        </Link>
+
+                            return (
+                                <Link
+                                    key={key}
+                                    href={link.url}
+                                    preserveScroll
+                                    className={`inline-flex min-w-10 items-center justify-center rounded-lg px-3 py-2 text-sm font-semibold ${
+                                        link.active
+                                            ? 'bg-primary text-white'
+                                            : 'bg-surface-container text-on-surface hover:bg-surface-container-high'
+                                    }`}
+                                >
+                                    {normalizedLabel}
+                                </Link>
+                            );
+                        })}
                     </div>
                 </div>
             </section>

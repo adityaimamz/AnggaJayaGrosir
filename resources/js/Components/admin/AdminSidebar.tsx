@@ -1,6 +1,5 @@
 import { Link, usePage } from '@inertiajs/react';
 import {
-    BarChart3,
     LayoutDashboard,
     MessageCircle,
     Package,
@@ -10,7 +9,7 @@ import {
     Menu,
     Image as ImageIcon,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 const navItems = [
     {
@@ -51,12 +50,47 @@ interface AdminSidebarProps {
     onMobileClose?: () => void;
 }
 
-export default function AdminSidebar({
-    mobileOpen = false,
-    onMobileClose,
-}: AdminSidebarProps) {
+export default function AdminSidebar(props: Readonly<AdminSidebarProps>) {
+    const { mobileOpen = false, onMobileClose } = props;
     const { url } = usePage();
     const [desktopCollapsed, setDesktopCollapsed] = useState(false);
+    const desktopSidebarRef = useRef<HTMLElement | null>(null);
+    const mobileSidebarRef = useRef<HTMLElement | null>(null);
+
+    useEffect(() => {
+        const handleOutsideClick = (event: MouseEvent | TouchEvent) => {
+            const target = event.target;
+
+            if (!(target instanceof Node)) {
+                return;
+            }
+
+            if (
+                mobileOpen &&
+                mobileSidebarRef.current !== null &&
+                !mobileSidebarRef.current.contains(target)
+            ) {
+                onMobileClose?.();
+            }
+
+            if (
+                !desktopCollapsed &&
+                globalThis.innerWidth >= 768 &&
+                desktopSidebarRef.current !== null &&
+                !desktopSidebarRef.current.contains(target)
+            ) {
+                setDesktopCollapsed(true);
+            }
+        };
+
+        document.addEventListener('mousedown', handleOutsideClick);
+        document.addEventListener('touchstart', handleOutsideClick);
+
+        return () => {
+            document.removeEventListener('mousedown', handleOutsideClick);
+            document.removeEventListener('touchstart', handleOutsideClick);
+        };
+    }, [desktopCollapsed, mobileOpen, onMobileClose]);
 
     const renderContent = (isCollapsed: boolean) => (
         <>
@@ -126,7 +160,7 @@ export default function AdminSidebar({
     return (
         <>
             {/* Desktop Sidebar */}
-            <aside className={`hidden flex-col bg-[#313030] text-white transition-all duration-300 md:flex ${
+            <aside ref={desktopSidebarRef} className={`hidden flex-col bg-[#313030] text-white transition-all duration-300 md:flex ${
                 desktopCollapsed ? 'w-20' : 'w-64'
             }`}>
                 {renderContent(desktopCollapsed)}
@@ -134,7 +168,9 @@ export default function AdminSidebar({
 
             {/* Mobile Overlay */}
             {mobileOpen && (
-                <div
+                <button
+                    type="button"
+                    aria-label="Tutup menu"
                     className="bg-black/50 fixed inset-0 z-40 md:hidden transition-opacity"
                     onClick={onMobileClose}
                 />
@@ -142,6 +178,7 @@ export default function AdminSidebar({
 
             {/* Mobile Sidebar Drawer */}
             <aside
+                ref={mobileSidebarRef}
                 className={`fixed inset-y-0 left-0 z-50 flex w-72 flex-col bg-[#313030] text-white shadow-2xl transition-transform duration-300 ease-in-out md:hidden ${
                     mobileOpen
                         ? 'translate-x-0'
