@@ -66,12 +66,12 @@ class ProductSummaryResource extends JsonResource
         /** @var FilesystemAdapter $storage */
         $storage = Storage::disk((string) config('media.disk', 'public'));
 
-        return array_values(array_map(static function (mixed $item) use ($storage): ?string {
+        return array_values(array_filter(array_map(static function (mixed $item) use ($storage): ?string {
             if (! is_string($item) || $item === '') {
                 return null;
             }
 
             return str_starts_with($item, 'products/') ? $storage->url($item) : $item;
-        }, $images));
+        }, $images)));
     }
 }
