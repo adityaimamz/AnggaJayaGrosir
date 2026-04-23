@@ -1,9 +1,13 @@
 import { Link, usePage } from '@inertiajs/react';
-import { Home, Search, ShoppingCart } from 'lucide-react';
+import { Heart, Home, PhoneCall, Search, ShoppingCart } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 interface CartItemSnapshot {
     quantity: number;
+}
+
+interface WishlistItemSnapshot {
+    id: number;
 }
 
 interface NavbarProps {
@@ -17,13 +21,18 @@ export default function Navbar({
 }: Readonly<NavbarProps>) {
     const { url } = usePage();
     const [cartCount, setCartCount] = useState(0);
+    const [wishlistCount, setWishlistCount] = useState(0);
     const [isMobileSearchOpen, setIsMobileSearchOpen] = useState(false);
 
     useEffect(() => {
-        const syncCartCount = () => {
+        const syncNavigationCounts = () => {
             const raw = localStorage.getItem('cart_items');
             const items: CartItemSnapshot[] = raw
                 ? (JSON.parse(raw) as CartItemSnapshot[])
+                : [];
+            const rawWishlist = localStorage.getItem('wishlist_items');
+            const wishlistItems: WishlistItemSnapshot[] = rawWishlist
+                ? (JSON.parse(rawWishlist) as WishlistItemSnapshot[])
                 : [];
 
             const totalQuantity = items.reduce(
@@ -32,25 +41,39 @@ export default function Navbar({
             );
 
             setCartCount(totalQuantity);
+            setWishlistCount(wishlistItems.length);
         };
 
-        syncCartCount();
+        syncNavigationCounts();
 
-        globalThis.addEventListener('storage', syncCartCount);
-        globalThis.addEventListener('cart:updated', syncCartCount);
-        globalThis.addEventListener('focus', syncCartCount);
+        globalThis.addEventListener('storage', syncNavigationCounts);
+        globalThis.addEventListener('cart:updated', syncNavigationCounts);
+        globalThis.addEventListener('wishlist:updated', syncNavigationCounts);
+        globalThis.addEventListener('focus', syncNavigationCounts);
 
         return () => {
-            globalThis.removeEventListener('storage', syncCartCount);
-            globalThis.removeEventListener('cart:updated', syncCartCount);
-            globalThis.removeEventListener('focus', syncCartCount);
+            globalThis.removeEventListener('storage', syncNavigationCounts);
+            globalThis.removeEventListener(
+                'cart:updated',
+                syncNavigationCounts,
+            );
+            globalThis.removeEventListener(
+                'wishlist:updated',
+                syncNavigationCounts,
+            );
+            globalThis.removeEventListener('focus', syncNavigationCounts);
         };
     }, []);
 
     const currentPath = url.split('?')[0];
-    const query = url.includes('?') ? new URLSearchParams(url.split('?')[1]) : null;
+    const query = url.includes('?')
+        ? new URLSearchParams(url.split('?')[1])
+        : null;
     const hasProductFilters = Boolean(
-        query?.has('search') || query?.has('category') || query?.has('brand') || query?.has('sort'),
+        query?.has('search') ||
+        query?.has('category') ||
+        query?.has('brand') ||
+        query?.has('sort'),
     );
     const isSearchVisible =
         currentPath === '/' ||
@@ -59,31 +82,35 @@ export default function Navbar({
 
     return (
         <nav className="glass-header fixed top-0 z-50 flex w-full flex-col shadow-sm">
-            <div className="flex h-20 w-full items-center justify-between px-6 md:px-10">
-                <div className="flex items-center gap-4 md:gap-8">
-                    <Link href="/" className="flex items-center gap-3">
+            <div className="flex h-20 w-full items-center justify-between px-5 md:px-10 lg:px-14">
+                <div className="flex items-center gap-4 lg:gap-10">
+                    <Link
+                        href="/"
+                        aria-label="Beranda ANGGA JAYA"
+                        className="group flex items-center gap-3"
+                    >
                         <img
                             alt="ANGGA JAYA Logo"
-                            className="h-10 w-auto"
+                            className="h-12 w-auto transition-transform duration-300 group-hover:scale-105 md:h-14"
                             src="/logo%20AJ.png"
                         />
-                        <span className="text-on-surface font-headline text-base sm:text-xl font-black tracking-tight uppercase md:text-2xl">
+                        <span className="font-headline text-primary hidden text-xl font-black tracking-tight uppercase sm:block lg:text-2xl">
                             ANGGA JAYA
                         </span>
                     </Link>
 
-                    <div className="hidden items-center gap-6 md:flex">
+                    <div className="hidden items-center gap-8 md:flex">
                         <Link
                             href="/"
-                            className={`font-headline text-lg font-bold transition-colors ${url === '/' ? 'text-primary' : 'text-on-surface-variant hover:text-primary'}`}
+                            className={`font-headline text-sm font-black tracking-wide uppercase transition-colors ${url === '/' ? 'text-primary' : 'text-on-surface-variant hover:text-primary'}`}
                         >
                             Beranda
                         </Link>
                         <Link
                             href="/kontak"
-                            className={`font-headline text-lg font-bold transition-colors ${url.startsWith('/kontak') ? 'text-primary' : 'text-on-surface-variant hover:text-primary'}`}
+                            className={`font-headline text-sm font-black tracking-wide uppercase transition-colors ${url.startsWith('/kontak') ? 'text-primary' : 'text-on-surface-variant hover:text-primary'}`}
                         >
-                            Kontak
+                            Kontak Kami
                         </Link>
                     </div>
                 </div>
@@ -105,12 +132,14 @@ export default function Navbar({
                     </div>
                 )}
 
-                <div className="flex items-center gap-2 md:gap-4">
+                <div className="flex items-center gap-1.5 md:gap-3">
                     <Link
                         href="/kontak"
-                        className={`font-headline rounded-full px-3 py-1.5 text-sm font-bold transition-colors md:hidden ${url.startsWith('/kontak') ? 'bg-primary/10 text-primary' : 'text-on-surface-variant hover:bg-surface-container'}`}
+                        aria-label="Kontak"
+                        title="Kontak"
+                        className={`rounded-full p-2 transition-colors md:hidden ${url.startsWith('/kontak') ? 'bg-primary/10 text-primary' : 'text-on-surface-variant hover:bg-surface-container'}`}
                     >
-                        Kontak
+                        <PhoneCall className="h-6 w-6" />
                     </Link>
                     {isSearchVisible && (
                         <button
@@ -128,9 +157,26 @@ export default function Navbar({
                     )}
                     <Link
                         href="/"
+                        aria-label="Beranda"
+                        title="Beranda"
                         className={`rounded-full p-2 transition-all md:hidden ${url === '/' ? 'text-primary' : 'text-on-surface-variant hover:bg-surface-container'}`}
                     >
                         <Home className="h-6 w-6" />
+                    </Link>
+                    <Link
+                        href="/wishlist"
+                        aria-label="Wishlist"
+                        title="Wishlist"
+                        className={`relative rounded-full p-2 transition-all ${url.startsWith('/wishlist') ? 'bg-primary/10 text-primary' : 'text-on-surface-variant hover:bg-surface-container hover:text-primary'}`}
+                    >
+                        <Heart
+                            className={`h-6 w-6 ${wishlistCount > 0 ? 'fill-current' : ''}`}
+                        />
+                        {wishlistCount > 0 ? (
+                            <span className="bg-primary absolute top-1 right-1 flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px] font-bold text-white">
+                                {wishlistCount > 99 ? '99+' : wishlistCount}
+                            </span>
+                        ) : null}
                     </Link>
                     <Link
                         href="/cart"

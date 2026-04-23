@@ -58,6 +58,16 @@ export interface CartItem {
     image: string | null;
 }
 
+export interface WishlistItem {
+    id: number;
+    name: string;
+    slug: string;
+    image: string | null;
+    minPrice: number;
+    maxPrice: number;
+    categoryName: string;
+}
+
 export interface AdminProductRow {
     id: number;
     name: string;

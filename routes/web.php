@@ -18,6 +18,9 @@ Route::get('/product/{slug}', [ProductController::class, 'show'])->name('product
 Route::get('/cart', function () {
     return Inertia::render('Cart');
 })->name('cart');
+Route::get('/wishlist', function () {
+    return Inertia::render('Wishlist');
+})->name('wishlist');
 Route::get('/kontak', function () {
     return Inertia::render('Contact');
 })->name('contact');

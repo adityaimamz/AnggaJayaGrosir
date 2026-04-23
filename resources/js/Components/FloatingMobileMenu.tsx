@@ -1,15 +1,20 @@
 import { Link } from '@inertiajs/react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Home, Package, Phone, ShoppingCart, Menu, X } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { Heart, Home, Menu, Phone, ShoppingCart, X } from 'lucide-react';
+import { useEffect, useState } from 'react';
 
 interface CartItemSnapshot {
     quantity: number;
 }
 
+interface WishlistItemSnapshot {
+    id: number;
+}
+
 export default function FloatingMobileMenu() {
     const [open, setOpen] = useState(false);
     const [cartCount, setCartCount] = useState(0);
+    const [wishlistCount, setWishlistCount] = useState(0);
 
     // Kunci scroll saat open
     useEffect(() => {
@@ -23,12 +28,16 @@ export default function FloatingMobileMenu() {
         };
     }, [open]);
 
-    // Sync cart count
+    // Sync cart and wishlist counts
     useEffect(() => {
-        const syncCartCount = () => {
+        const syncCounts = () => {
             const raw = localStorage.getItem('cart_items');
             const items: CartItemSnapshot[] = raw
                 ? (JSON.parse(raw) as CartItemSnapshot[])
+                : [];
+            const rawWishlist = localStorage.getItem('wishlist_items');
+            const wishlistItems: WishlistItemSnapshot[] = rawWishlist
+                ? (JSON.parse(rawWishlist) as WishlistItemSnapshot[])
                 : [];
 
             const totalQuantity = items.reduce(
@@ -37,44 +46,67 @@ export default function FloatingMobileMenu() {
             );
 
             setCartCount(totalQuantity);
+            setWishlistCount(wishlistItems.length);
         };
 
-        syncCartCount();
+        syncCounts();
 
-        globalThis.addEventListener('storage', syncCartCount);
-        globalThis.addEventListener('cart:updated', syncCartCount);
-        globalThis.addEventListener('focus', syncCartCount);
+        globalThis.addEventListener('storage', syncCounts);
+        globalThis.addEventListener('cart:updated', syncCounts);
+        globalThis.addEventListener('wishlist:updated', syncCounts);
+        globalThis.addEventListener('focus', syncCounts);
 
         return () => {
-            globalThis.removeEventListener('storage', syncCartCount);
-            globalThis.removeEventListener('cart:updated', syncCartCount);
-            globalThis.removeEventListener('focus', syncCartCount);
+            globalThis.removeEventListener('storage', syncCounts);
+            globalThis.removeEventListener('cart:updated', syncCounts);
+            globalThis.removeEventListener('wishlist:updated', syncCounts);
+            globalThis.removeEventListener('focus', syncCounts);
         };
     }, []);
 
     // Berurutan dari bawah ke atas saat render absolute di flex col
     const items = [
-        { title: 'Kontak', icon: <Phone className="h-5 w-5" />, href: '/kontak' },
-        { 
-            title: 'Keranjang', 
+        {
+            title: 'Kontak',
+            icon: <Phone className="h-5 w-5" />,
+            href: '/kontak',
+        },
+        {
+            title: 'Wishlist',
+            icon: (
+                <div className="relative flex h-full w-full items-center justify-center">
+                    <Heart
+                        className={`h-5 w-5 ${wishlistCount > 0 ? 'fill-current' : ''}`}
+                    />
+                    {wishlistCount > 0 && (
+                        <span className="absolute -top-2 -right-2 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white shadow-sm">
+                            {wishlistCount}
+                        </span>
+                    )}
+                </div>
+            ),
+            href: '/wishlist',
+        },
+        {
+            title: 'Keranjang',
             icon: (
                 <div className="relative flex h-full w-full items-center justify-center">
                     <ShoppingCart className="h-5 w-5" />
                     {cartCount > 0 && (
-                        <span className="absolute -right-2 -top-2 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white shadow-sm">
+                        <span className="absolute -top-2 -right-2 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white shadow-sm">
                             {cartCount}
                         </span>
                     )}
                 </div>
-            ), 
-            href: '/cart' 
+            ),
+            href: '/cart',
         },
         // { title: 'Produk', icon: <Package className="h-5 w-5" />, href: '/products' },
         { title: 'Beranda', icon: <Home className="h-5 w-5" />, href: '/' },
     ];
 
     return (
-        <div className="fixed bottom-6 right-6 z-[999] block md:hidden">
+        <div className="fixed right-6 bottom-6 z-[999] block md:hidden">
             <AnimatePresence>
                 {open && (
                     <>
@@ -88,12 +120,19 @@ export default function FloatingMobileMenu() {
 
                         <motion.div
                             layoutId="nav"
-                            className="absolute bottom-full right-0 mb-4 flex flex-col items-center gap-4"
+                            className="absolute right-0 bottom-full mb-4 flex flex-col items-center gap-4"
                         >
                             {items.map((item, idx) => (
-                                <div key={item.title} className="relative group">
+                                <div
+                                    key={item.title}
+                                    className="group relative"
+                                >
                                     <motion.div
-                                        initial={{ opacity: 0, y: 15, scale: 0.8 }}
+                                        initial={{
+                                            opacity: 0,
+                                            y: 15,
+                                            scale: 0.8,
+                                        }}
                                         animate={{
                                             opacity: 1,
                                             y: 0,
@@ -107,16 +146,22 @@ export default function FloatingMobileMenu() {
                                                 delay: idx * 0.05,
                                             },
                                         }}
-                                        transition={{ delay: (items.length - 1 - idx) * 0.05, type: 'spring', stiffness: 200, damping: 20 }}
+                                        transition={{
+                                            delay:
+                                                (items.length - 1 - idx) * 0.05,
+                                            type: 'spring',
+                                            stiffness: 200,
+                                            damping: 20,
+                                        }}
                                         className="flex items-center gap-3"
                                     >
-                                        <div className="whitespace-nowrap rounded-lg bg-surface px-3 py-1.5 text-sm font-semibold text-on-surface shadow-md">
+                                        <div className="bg-surface text-on-surface rounded-lg px-3 py-1.5 text-sm font-semibold whitespace-nowrap shadow-md">
                                             {item.title}
                                         </div>
                                         <Link
                                             href={item.href}
                                             onClick={() => setOpen(false)}
-                                            className="flex h-12 w-12 items-center justify-center rounded-full bg-surface text-on-surface shadow-[0_4px_12px_rgba(0,0,0,0.15)] ring-1 ring-black/5 transition-colors focus:bg-surface-container"
+                                            className="bg-surface text-on-surface focus:bg-surface-container flex h-12 w-12 items-center justify-center rounded-full shadow-[0_4px_12px_rgba(0,0,0,0.15)] ring-1 ring-black/5 transition-colors"
                                         >
                                             {item.icon}
                                         </Link>
@@ -131,7 +176,7 @@ export default function FloatingMobileMenu() {
             <button
                 onClick={() => setOpen(!open)}
                 aria-label="Toggle Menu"
-                className="flex h-14 w-14 items-center justify-center rounded-full bg-primary text-white shadow-[0_4px_16px_rgba(0,0,0,0.25)] transition-transform active:scale-95 z-20 relative ring-2 ring-primary/20"
+                className="bg-primary ring-primary/20 relative z-20 flex h-14 w-14 items-center justify-center rounded-full text-white shadow-[0_4px_16px_rgba(0,0,0,0.25)] ring-2 transition-transform active:scale-95"
             >
                 <AnimatePresence mode="wait">
                     {open ? (
