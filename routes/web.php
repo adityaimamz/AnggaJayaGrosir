@@ -45,6 +45,7 @@ Route::middleware(['auth'])->prefix('admin')->group(function () {
     Route::put('/categories/{category}', [CategoryManagementController::class, 'update'])->name('admin.categories.update');
     Route::delete('/categories/{category}', [CategoryManagementController::class, 'destroy'])->name('admin.categories.destroy');
     Route::get('/wa-orders', [WhatsappOrderManagementController::class, 'index'])->name('admin.wa-orders.index');
+    Route::delete('/wa-orders', [WhatsappOrderManagementController::class, 'bulkDestroy'])->name('admin.wa-orders.bulk-destroy');
     Route::get('/brands', [BrandManagementController::class, 'index'])->name('admin.brands.index');
     Route::post('/brands', [BrandManagementController::class, 'store'])->name('admin.brands.store');
     Route::put('/brands/{brand}', [BrandManagementController::class, 'update'])->name('admin.brands.update');

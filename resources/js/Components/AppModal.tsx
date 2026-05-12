@@ -23,9 +23,12 @@ export default function AppModal({
     }
 
     return (
-        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/55 px-4 py-6">
+        <div
+            className="fixed inset-0 z-[90] flex items-center justify-center bg-black/55 px-4 py-6"
+            onClick={onClose}
+        >
             <div
-                className={`bg-surface-container-lowest w-full ${maxWidthClass} rounded-2xl border border-black/5 p-5 shadow-xl`}
+                className={`bg-surface-container-lowest w-full ${maxWidthClass} max-h-[calc(100vh-3rem)] overflow-y-auto rounded-2xl border border-black/5 p-5 shadow-xl`}
                 onClick={(event) => event.stopPropagation()}
             >
                 <div className="mb-3 flex items-start justify-between gap-3">

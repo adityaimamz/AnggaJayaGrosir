@@ -30,5 +30,31 @@ final class WhatsappOrderManagementController extends Controller
             'orders' => PaginatedData::fromLengthAwarePaginator($orders)->toArray(),
         ]);
     }
+    public function bulkDestroy(\Illuminate\Http\Request $request): \Illuminate\Http\RedirectResponse
+    {
+        $validated = $request->validate([
+            'ids' => ['nullable', 'array'],
+            'ids.*' => ['integer', 'exists:whatsapp_orders,id'],
+            'delete_all' => ['nullable', 'boolean'],
+        ]);
+
+        if (!empty($validated['delete_all'])) {
+            WhatsappOrder::query()->delete();
+
+            return redirect()
+                ->route('admin.wa-orders.index')
+                ->with('success', 'Semua riwayat pesanan berhasil dihapus.');
+        }
+
+        if (!empty($validated['ids'])) {
+            WhatsappOrder::whereIn('id', $validated['ids'])->delete();
+
+            return redirect()
+                ->route('admin.wa-orders.index')
+                ->with('success', count($validated['ids']) . ' pesanan berhasil dihapus.');
+        }
+
+        return redirect()->route('admin.wa-orders.index');
+    }
 }
 

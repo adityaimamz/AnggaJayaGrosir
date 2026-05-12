@@ -1,8 +1,10 @@
 import AppModal from '@/Components/AppModal';
+import Checkbox from '@/Components/Checkbox';
+import ConfirmDialog from '@/Components/ui/confirm-dialog';
 import AdminLayout from '@/Layouts/AdminLayout';
 import { AdminWhatsappOrderRow, LengthAwarePaginated } from '@/types/domain';
-import { Link } from '@inertiajs/react';
-import { ChevronLeft, ChevronRight, Eye, MessageCircle } from 'lucide-react';
+import { Link, router } from '@inertiajs/react';
+import { ChevronLeft, ChevronRight, Eye, MessageCircle, Printer, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 
 interface WaOrdersProps {
@@ -18,6 +20,107 @@ const currencyFormatter = new Intl.NumberFormat('id-ID', {
 export default function WaOrders({ orders }: WaOrdersProps) {
     const [activeOrder, setActiveOrder] =
         useState<AdminWhatsappOrderRow | null>(null);
+    const [selectedIds, setSelectedIds] = useState<number[]>([]);
+    const [confirmDeleteType, setConfirmDeleteType] = useState<'bulk' | 'all' | null>(null);
+    const [isDeleting, setIsDeleting] = useState(false);
+
+    const toggleSelectAll = () => {
+        if (selectedIds.length === orders.data.length && orders.data.length > 0) {
+            setSelectedIds([]);
+        } else {
+            setSelectedIds(orders.data.map((o) => o.id));
+        }
+    };
+
+    const toggleSelect = (id: number) => {
+        if (selectedIds.includes(id)) {
+            setSelectedIds(selectedIds.filter((i) => i !== id));
+        } else {
+            setSelectedIds([...selectedIds, id]);
+        }
+    };
+
+    const executeDelete = () => {
+        if (!confirmDeleteType) return;
+        setIsDeleting(true);
+
+        const data = confirmDeleteType === 'all'
+            ? { delete_all: true }
+            : { ids: selectedIds };
+
+        router.delete('/admin/wa-orders', {
+            data,
+            preserveScroll: true,
+            onSuccess: () => {
+                setSelectedIds([]);
+                setConfirmDeleteType(null);
+            },
+            onFinish: () => setIsDeleting(false),
+        });
+    };
+
+    const printInvoice = () => {
+        if (!activeOrder) return;
+        const windowPrint = window.open('', '', 'left=0,top=0,width=800,height=900,toolbar=0,scrollbars=0,status=0');
+        if (!windowPrint) return;
+
+        windowPrint.document.write(`
+            <html>
+                <head>
+                    <title>Invoice - ${activeOrder.orderCode}</title>
+                    <style>
+                        body { font-family: sans-serif; padding: 20px; color: #1a1a1a; }
+                        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+                        th, td { border: 1px solid #ddd; padding: 10px; text-align: left; font-size: 14px; }
+                        th { background-color: #f9fafb; }
+                        .header { margin-bottom: 20px; border-bottom: 2px solid #000; padding-bottom: 15px; }
+                        .header h2 { margin: 0 0 10px 0; }
+                        .header p { margin: 4px 0; font-size: 14px; }
+                        .total { font-weight: bold; font-size: 1.2em; text-align: right; margin-top: 20px; padding-top: 10px; border-top: 2px solid #000; }
+                    </style>
+                </head>
+                <body>
+                    <div class="header">
+                        <h2>Invoice: ${activeOrder.orderCode}</h2>
+                        <p><strong>Pelanggan:</strong> ${activeOrder.customerName}</p>
+                        <p><strong>Alamat:</strong> ${activeOrder.address}</p>
+                        <p><strong>Ekspedisi:</strong> ${activeOrder.expedition}</p>
+                        <p><strong>Tanggal:</strong> ${activeOrder.createdAt ? new Date(activeOrder.createdAt).toLocaleString('id-ID') : '-'}</p>
+                    </div>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Produk</th>
+                                <th>Qty</th>
+                                <th>Harga</th>
+                                <th>Subtotal</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${activeOrder.items.map(item => `
+                                <tr>
+                                    <td>
+                                        <strong>${item.name}</strong><br>
+                                        <span style="color: #666; font-size: 12px;">${item.size} &middot; ${item.pack}</span>
+                                    </td>
+                                    <td>${item.quantity}</td>
+                                    <td>${currencyFormatter.format(item.price)}</td>
+                                    <td>${currencyFormatter.format(item.subtotal)}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                    <div class="total">
+                        Total: ${currencyFormatter.format(activeOrder.totalAmount)}
+                    </div>
+                </body>
+            </html>
+        `);
+        windowPrint.document.close();
+        windowPrint.focus();
+        windowPrint.print();
+        windowPrint.close();
+    };
 
     return (
         <AdminLayout>
@@ -41,12 +144,39 @@ export default function WaOrders({ orders }: WaOrdersProps) {
                             dari {orders.total} pesanan
                         </p>
                     </div>
+                    <div className="flex flex-wrap gap-2">
+                        {selectedIds.length > 0 && (
+                            <button
+                                type="button"
+                                onClick={() => setConfirmDeleteType('bulk')}
+                                className="bg-error text-white hover:brightness-110 inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-all shadow-sm"
+                            >
+                                <Trash2 className="h-4 w-4" /> Hapus {selectedIds.length} Terpilih
+                            </button>
+                        )}
+                        {orders.total > 0 && (
+                            <button
+                                type="button"
+                                onClick={() => setConfirmDeleteType('all')}
+                                className="bg-error/10 text-error hover:bg-error/20 inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-all"
+                            >
+                                <Trash2 className="h-4 w-4" /> Hapus Semua
+                            </button>
+                        )}
+                    </div>
                 </div>
 
                 <div className="overflow-x-auto">
                     <table className="divide-surface-container-highest min-w-full divide-y text-left">
                         <thead>
                             <tr className="text-on-surface-variant/70 text-xs tracking-wider uppercase">
+                                <th className="py-3 pl-4 pr-2 w-10">
+                                    <Checkbox
+                                        className="h-4 w-4"
+                                        checked={selectedIds.length === orders.data.length && orders.data.length > 0}
+                                        onChange={toggleSelectAll}
+                                    />
+                                </th>
                                 <th className="py-3 pr-4">Kode</th>
                                 <th className="py-3 pr-4">Pelanggan</th>
                                 <th className="py-3 pr-4">Ekspedisi</th>
@@ -62,6 +192,13 @@ export default function WaOrders({ orders }: WaOrdersProps) {
                                     key={order.id}
                                     className="hover:bg-surface-container-low"
                                 >
+                                    <td className="py-3 pl-4 pr-2">
+                                        <Checkbox
+                                            className="h-4 w-4"
+                                            checked={selectedIds.includes(order.id)}
+                                            onChange={() => toggleSelect(order.id)}
+                                        />
+                                    </td>
                                     <td className="py-3 pr-4">
                                         <span className="bg-primary-fixed text-on-primary-fixed inline-flex rounded-full px-2.5 py-1 text-xs font-bold">
                                             {order.orderCode}
@@ -229,9 +366,35 @@ export default function WaOrders({ orders }: WaOrdersProps) {
                                 {currencyFormatter.format(activeOrder.totalAmount)}
                             </span>
                         </div>
+
+                        <div className="flex justify-end pt-2">
+                            <button
+                                type="button"
+                                onClick={printInvoice}
+                                className="bg-primary text-white hover:brightness-110 inline-flex items-center gap-2 rounded-lg px-5 py-2.5 text-sm font-semibold transition-all shadow-sm"
+                            >
+                                <Printer className="h-4 w-4" /> Cetak Invoice
+                            </button>
+                        </div>
                     </div>
                 ) : null}
             </AppModal>
+
+            <ConfirmDialog
+                open={confirmDeleteType !== null}
+                title={confirmDeleteType === 'all' ? 'Hapus Semua Pesanan' : 'Hapus Pesanan Terpilih'}
+                description={
+                    confirmDeleteType === 'all'
+                        ? 'Apakah Anda yakin ingin menghapus seluruh riwayat pesanan WhatsApp secara permanen? Tindakan ini tidak dapat dibatalkan.'
+                        : `Apakah Anda yakin ingin menghapus ${selectedIds.length} pesanan yang dipilih? Tindakan ini tidak dapat dibatalkan.`
+                }
+                confirmLabel="Ya, Hapus"
+                cancelLabel="Batal"
+                processing={isDeleting}
+                danger
+                onCancel={() => setConfirmDeleteType(null)}
+                onConfirm={executeDelete}
+            />
         </AdminLayout>
     );
 }

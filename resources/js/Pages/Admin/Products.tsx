@@ -19,6 +19,7 @@ import {
     notifyUpdated,
 } from '@/utils/notify';
 import { Link, router, useForm, usePage } from '@inertiajs/react';
+import axios from 'axios';
 import {
     Filter,
     Pencil,
@@ -1648,66 +1649,18 @@ function BrandManagerModal({
     const [loading, setLoading] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
 
-    const getCookieValue = (name: string): string => {
-        const pair = document.cookie
-            .split('; ')
-            .find((item) => item.startsWith(`${name}=`));
-
-        return pair ? decodeURIComponent(pair.split('=').slice(1).join('=')) : '';
-    };
-
-    const getCsrfHeaders = (): Record<string, string> => {
-        const headers: Record<string, string> = {
-            Accept: 'application/json',
-            'X-Requested-With': 'XMLHttpRequest',
-        };
-
-        const csrfToken = (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement | null)?.content ?? '';
-
-        if (csrfToken) {
-            headers['X-CSRF-TOKEN'] = csrfToken;
-        }
-
-        return headers;
-    };
-
-    const getCsrfToken = (): string => {
-        const tokenFromMeta = (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement | null)?.content ?? '';
-        if (tokenFromMeta) {
-            return tokenFromMeta;
-        }
-
-        return getCookieValue('XSRF-TOKEN');
-    };
-
-    const buildBrandFormData = (payload: Record<string, string>): FormData => {
-        const formData = new FormData();
-        const csrfToken = getCsrfToken();
-
-        if (csrfToken) {
-            formData.append('_token', csrfToken);
-        }
-
-        Object.entries(payload).forEach(([key, value]) => {
-            formData.append(key, value);
-        });
-
-        return formData;
-    };
-
-    const readErrorMessage = async (res: Response, fallback: string): Promise<string> => {
-        const contentType = res.headers.get('content-type') ?? '';
-
-        if (!contentType.includes('application/json')) {
+    const readAxiosErrorMessage = (error: unknown, fallback: string): string => {
+        if (!axios.isAxiosError(error)) {
             return fallback;
         }
 
-        try {
-            const json = (await res.json()) as { message?: string };
-            return json.message || fallback;
-        } catch {
-            return fallback;
+        if (error.response?.status === 419) {
+            return 'Sesi login tidak valid atau token keamanan tidak cocok. Muat ulang halaman.';
         }
+
+        const data = error.response?.data as { message?: string } | undefined;
+
+        return data?.message || fallback;
     };
 
     const resetForm = () => {
@@ -1718,12 +1671,8 @@ function BrandManagerModal({
     };
 
     const fetchBrands = async () => {
-        const res = await fetch('/admin/brands', {
-            credentials: 'same-origin',
-            headers: getCsrfHeaders(),
-        });
-        const json = await res.json();
-        onBrandsChange(json.data);
+        const response = await axios.get<{ data: BrandOption[] }>('/admin/brands');
+        onBrandsChange(response.data.data);
     };
 
     const handleSave = async () => {
@@ -1737,35 +1686,17 @@ function BrandManagerModal({
             const isEditing = editingId !== null;
             const url = editingId ? `/admin/brands/${editingId}` : '/admin/brands';
 
-            const payload: Record<string, string> = {
+            const payload = {
                 kode: kode.trim(),
                 keterangan: keterangan.trim(),
             };
 
             if (isEditing) {
-                payload._method = 'PUT';
+                await axios.put(url, payload);
+            } else {
+                await axios.post(url, payload);
             }
 
-            const res = await fetch(url, {
-                method: 'POST',
-                credentials: 'same-origin',
-                headers: getCsrfHeaders(),
-                body: buildBrandFormData(payload),
-            });
-            if (!res.ok) {
-                const contentType = res.headers.get('content-type') ?? '';
-                if (contentType.includes('application/json')) {
-                    const json = await res.json();
-                    const message = json.message || 'Gagal menyimpan merek.';
-                    setError(message);
-                    notifyError(message);
-                } else {
-                    const message = 'Sesi login tidak valid atau token keamanan tidak cocok. Muat ulang halaman.';
-                    setError(message);
-                    notifyError(message);
-                }
-                return;
-            }
             await fetchBrands();
             resetForm();
             if (isEditing) {
@@ -1773,9 +1704,10 @@ function BrandManagerModal({
             } else {
                 notifyCreated('Merek');
             }
-        } catch {
-            setError('Terjadi kesalahan jaringan.');
-            notifyError('Terjadi kesalahan jaringan.');
+        } catch (error) {
+            const message = readAxiosErrorMessage(error, 'Gagal menyimpan merek.');
+            setError(message);
+            notifyError(message);
         } finally {
             setLoading(false);
         }
@@ -1792,29 +1724,12 @@ function BrandManagerModal({
         setLoading(true);
         setError('');
         try {
-            const res = await fetch(`/admin/brands/${id}`, {
-                method: 'POST',
-                credentials: 'same-origin',
-                headers: getCsrfHeaders(),
-                body: buildBrandFormData({ _method: 'DELETE' }),
-            });
-
-            if (!res.ok) {
-                const fallbackMessage =
-                    res.status === 419
-                        ? 'Sesi login tidak valid atau token keamanan tidak cocok. Muat ulang halaman.'
-                        : 'Gagal menghapus merek.';
-                const message = await readErrorMessage(res, fallbackMessage);
-                setError(message);
-                notifyError(message);
-                return;
-            }
-
+            await axios.delete(`/admin/brands/${id}`);
             await fetchBrands();
             if (editingId === id) resetForm();
             notifyDeleted('Merek');
-        } catch {
-            const message = 'Gagal menghapus merek.';
+        } catch (error) {
+            const message = readAxiosErrorMessage(error, 'Gagal menghapus merek.');
             setError(message);
             notifyError(message);
         } finally {
